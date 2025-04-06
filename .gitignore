@@ -1,0 +1,18 @@
+ds-proj-venv/ 
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings (if using)
+.vscode/
+
+# Mac system files (safe to include just in case)
+.DS_Store
+
+# Data files
+data/
