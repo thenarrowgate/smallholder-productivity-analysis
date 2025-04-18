@@ -1,0 +1,284 @@
+Nepal:
+
+V1 - version, ordinal
+x Result_Id
+x Device_Name - enumerator, nominal
+Surveyed_Date - date, temporal
+Surveyed_Time - beginning, temporal
+Surveyed - date, temporal
+End - end, temporal
+how_long_was_the_survey - how many minutes, temporal
+x Incomplete
+Location_Latitude - latitude, continuous
+Location_Longitude - longitude, continuous
+Location_Altitude - altitude, continuous
+Location_Accuracy - accuracy, continuous
+Latitude - latitude, continuous
+Longitude - longitude, continuous
+Altitude - altitude, continuous
+Accuracy - accuracy, continuous
+x LocationStatus
+x ExtraInformation
+Q2._What_is_the_date_and_time_now - beginning, temporal
+x Q3._Name_of_farmer
+Q4._Phone_Number__if_doesnt_have_a_phone_please_press_000 - phone number, nominal
+Q5._Age_years - age, continuous
+Q6._VDC - village development committee, nominal
+Q7._District - district, nominal
+Q8._Ward_number - local municipality, nominal
+Q9._Name_of_village - nominal
+Sex_male1 - binary
+marital_status_Single - binary
+marital_status_Married - binary
+marital_status_Divorced - binary
+marital_status_Widow - binary
+x Q12._Who_makes_farming_decisions_in_this_holding_Me1
+x Q14._Did_you_participate_in_a_learning_program_abroad_for_exampl - no one did
+@1I_can_think_of_many_ways_to_get_out_of_a_jam - hope, ordinal
+@2I_energetically_pursue_my_goals - hope, ordinal
+@3_I_feel_tired_most_of_the_time - hope, ordinal
+@4_There_are_lots_of_ways_around_any_problem - hope, ordinal
+@5I_am_easily_downed_being_at_a_low_position_brought_down_in_an - hope, ordinal
+@6I_can_think_of_many_ways_to_get_the_things_in_life_that_are_im - hope, ordinal
+@7I_worry_about_my_health - hope, ordinal
+@8Even_when_others_get_discouraged_I_know_I_can_find_a_way_to_so - hope, ordinal
+@9My_past_experiences_have_prepared_me_well_for_my_future - hope, ordinal
+@10_I’ve_been_pretty_successful_in_life - hope, ordinal
+@11_I_usually_find_myself_worrying_about_something - hope ordinal
+@12_I_meet_the_goals_that_I_set_for_myself - hope, ordinal
+Q30._E.1._Interested_1 - feelings of past week, ordinal
+Q31._E.2.Distressed_worried_1 - feelings of past week, ordinal
+Q32._E.3._Excited_1 - feelings of past week, ordinal
+Q33._E.4._Upset_1 - feelings of past week, ordinal
+Q34._E.5.Strong_1 - feelings of past week, ordinal
+Q35._E.6._Guilty_1 - feelings of past week, ordinal
+Q36._E.7._Scared_1 - feelings of past week, ordinal
+Q37._E.8._Hostile_If_you_are_hostile_to_another_person_or_an_ide - feelings of past week, ordinal
+Q38._E.9._Enthusiastic_1 - feelings of past week, ordinal
+Q39._E.10._Proud_1 - feelings of past week, ordinal
+Q40._E.11._Irritable_you_are_easily_annoyed_1 - feelings of past week, ordinal
+Q41._E.12._Alert_you_are_paying_full_attention_to_things_around - feelings of past week, ordinal
+Q42._E.13._Ashamed_1 - feelings of past week, ordinal
+Q43._E.14._Inspired_1 - feelings of past week, ordinal
+Q44._E.15._Nervous_1 - feelings of past week, ordinal
+Q45._E.16._Determined_not_willing_to_let_anything_prevent_you_fr - feelings of past week, ordinal
+Q46._E.17._Attentive_paying_close_attention_to_what_is_being_sai - feelings of past week, ordinal
+Q47._E.18._Jittery_anxious_jumpy__1 - feelings of past week, ordinal
+Q48._E.19._Active_engaged_in_action_1 - feelings of past week, ordinal
+Q49._E.20._Afraid_1 - feelings of past week, ordinal
+target Q50._A._How_much_land_that_is_yours_do_you_cultivate_biggaif_the - continuous
+target Q51._A._How_much_land_that_is_rentedleased_do_you_cultivate_bigg - continuous
+target Q52._A._On_how_much_land_do_you_grow_vegetables_bigga_if_they_re - on how much land do you grow vegs, continuous
+type_of_crop_rice - binary
+type_of_crop_fruit - binary
+x type_of_crop_vegetables
+type_of_crop_Millet - binary
+type_of_crop_maize - binary
+type_of_crop_othercereals - binary
+type_of_crop_Cotton - binary
+type_of_crop_other - binary
+For_Vegetables_source_of_seeds_Selfprepared - binary
+For_Vegetables_source_of_seeds_Bought_from_neighbor - binary
+For_Vegetables_source_of_seeds_shop binary
+Q55._A._For_VegetablesDo_you_use_improvedhybrid_variety_seeds_Ye - binary
+For_vegetables_do_you_use_seedlings_Selfprepared_seedlings - binary
+For_vegetables_do_you_use_seedlings_Bought_seedlings_from_neighb - binary
+For_vegetables_do_you_use_seedlings_Bought_seedlings__in_shop - binary
+Q57._If__you_self_prepare_seedlings_how_Nursery1 - binary
+fertilizer_on_this_plot__chemical - binary
+fertilizer_on_this_plot__manure - binary
+x Q59._A._for_surveyor_do_not_ask_farmerLook_in_the_field_does_the
+Q60._A._do_you_use_pesticides_or_herbicides_on_this_plot_Yes1 - binary
+x Q61._A._for_surveyor_do_not_ask_farmerLook_in_the_field_does_the
+target Q62._A._How_much_VEGETABLES_do_you_harvest_per_year_from_this_pl - continuous
+Q63._A._What_is_the_main_use_of_produce_from_holding___Household - binary
+Q63._A._What_is_the_main_use_of_produce_from_holding_Sale_mostly - binary
+Q63._A._What_is_the_main_use_of_produce_from_holding_Both_about - binary
+do_you_use_tractor - binary
+@_do_you_use_seeder - binary
+@_do_you_use_plow - binary
+@_do_you_use_draft_animals_for_example_oxen - binary
+@_do_you_use_sprayer - binary
+@_do_you_use_cart - binary
+@_do_you_use_pump - binary
+@_do_you_use_Net_mesh_to_cover_the_crops - binary
+@_do_you_use_green_house - binary
+@_do_you_use_tunnel - binary
+farming_practices_Cover_crops_a_crop_grown_for_the_protection_an - binary
+farming_practices_intercropping_grow_a_crop_among_plants_of_a_di - binary
+farming_practices_Crop_rotation_growing_different_types_of_crops - binary
+farming_practices_Soil_analysis - binary
+farming_practices_Manuring - binary
+farming_practices_Take_out_the_weeds_from_your_cultivated_land - binary
+x Q66._A.For_surveyor_do_not_ask_farmerLook_in_the_field_does_the
+soil_analysis__FOR_I_dont_use_soil_analysis - binary
+soil_analysis__FOR_to_know_how_much_fertilizer_I_need_to_use - binary
+soil_analysis__FOR_to_know_how_much_pesticides__I_need_to_use - binary
+soil_analysis__FOR_to_know_how_much_lime_I_need_to_use - binary
+soil_analysis__FOR_to_know_if_my_land_holds_water_so_I_can_irrig - binary
+soil_analysis__FOR_to_know_what_type_of_crops_I_should_grow - binary
+soil_analysis__FOR_to_know_what_types_of_nutrients_I_need_to_add - binary
+soil_analysis__FOR_Other - binary
+conduct_soil_analysis__I_dont_use_soil_analysis - binary
+conduct_soil_analysis__take_sample_to_districts_agriculture_offi - binary
+conduct_soil_analysis_call_JTA_to_my_plot_so_they_can_do_it_for - binary
+conduct_soil_analysis_Other - binary
+@_soil_analysis__I_dont_use_soil_analysis - binary
+@_soil_analysis_Because_of_soil_analysis_I_use_less_water - binary
+@__soil_analysis__Because_of_soil_analysis_I_use_less_fertilizer - binary
+@_soil_analysis__Because_of_soil_analysis_I_use_less_pesticide - binary
+@_soil_analysis__Because_of_soil_analysis_I_use_less_lime - binary
+@_soil_analysis__Because_of_soil_analysis_I_grow_different_crops - binary
+@_soil_analysis__since_I_use_soil_analysis_I_have_more_harvest - binary
+information - in the past 12 months did you receive info from anyone on agriculture, binary
+from_who_Government - if gets, information, then binary, keep nominal for those who don't get info
+from_who__NGOs - nominal
+from_who__Agriculture_cooperative - nominal
+from_another_country - nominal
+from_who__Groupmant__Association - nominal
+from_who__Other - nominal
+Q72._I.Please_specify_the_names_of_organizations - for those who answered that they do get info, they specify more from whom, nominal
+Did_you_receive_anything_from_them__Yes_drip_irrigation - meaning from question 72, nominal (for those who don't get anything)
+Did_you_receive_anything_from_them__Yes_fertilizer_chemical - nominal
+Did_you_receive_anything_from_them__Yes_pesticide - nominal
+Did_you_receive_anything_from_them__Yes_herbicide - nominal
+Did_you_receive_anything_from_them__Yes_seeds - nominal
+Did_you_receive_anything_from_them__Yes_seedlings - nominal
+Did_you_receive_anything_from_them_Yes_water_pump - nominal
+Did_you_receive_anything_from_them_NO0 - nominal
+@_Did_you_receive_anything_from_them_Other - nominal
+@_deiced_to_plow_I_look_at_the_weather_by_my_self - binary
+@_deiced_to_plow_weather_from_radio is of type - binary
+@_deiced_to_plow_weather_from_TV - binary
+@_deiced_to_plow_weather_from_SMS_mobile_device - binary
+@_deiced_to_plow__email_of_weather - binary
+@_deiced_to_plow_weather_website - binary
+decide_to_begin_sowing_I_look_at_the_weather_by_my_self - binary
+decide_to_begin_sowing_I_have_different_reasons_that_dont_have_t - binary
+decide_to_begin_sowing_weather_from_radio - binary
+decide_to_begin_sowing_weather_from_TV - binary
+decide_to_begin_sowing_weather_from_SMS_mobile_device - binary
+decide_to_begin_sowing_email_of_weather - binary
+decide_to_begin_sowing_weather_website - binary
+irrigation_surface_irrigation - binary
+Drip.Sprinklers - binary
+irrigation_Drip_irrigation - binary
+irrigation_Sprinklers - binary
+irrigation_Pump_treadle - binary
+x Q77._for_surveyor_do_not_ask_farmerLook_in_the_field_Does_the_an
+Q78._How_many_years_have_you_been_using_drip_irrigation_if_non_0 - continuous
+Q80._S._1.When_I_do_a_boring_job_I_think_about_the_less_boring_p - self control, ordinal
+Q81._S._2.By_changing_my_way_of_thinking_I_am_often_able_to_chan - self control, ordinal
+Q82._S.3._I_often_find_it_difficult_to_overcome_my_feelings_of_n - self control, ordinal
+Q83._S._4.When_I_am_feeling_depressed_I_try_to_think_about_pleas - self control, ordinal
+Q84._S.5.I_cannot_help_thinking_about_mistakes_I_made__3 - self control, ordinal
+Q85._S.6.I_usually_do_what_I_am_supposed_to_do_more_quickly_when - self control, ordinal
+Q86._S._7.When_I_am_faced_with_a_difficult_decision_I_prefer_to - self control, ordinal
+Q87._S._8.When_I_try_to_get_rid_of_a_bad_habit_for_example_smoki - self control, ordinal
+Q88._S.9.If_I_smoked_two_packs_of_cigarettes_a_day_I_would_need - self control, ordinal
+Q89._S.10._When_I_feel_down_I_try_to_act_cheerful_so_that_my_moo - self control, ordinal
+Q90._S.11.I_tend_to_postpone_unpleasant_tasks__3 - self control, ordinal
+Q91._S.12.I_prefer_to_finish_a_job_that_I_have_to_do_before_I_st - self control, ordinal
+Q92._S.13.When_I_feel_pain_I_try_not_to_think_about_it__3  - self control, ordinal
+Q93._S.14.My_selfesteem_increases_when_I_am_able_to_overcome_a_b - self control, ordinal
+Q94._S.15.When_I_feel_that_I_am_too_impulsive_I_tell_myself_to_s - self control, ordinal
+Q95._S.16.Even_when_I_am_terribly_angry_at_someone_I_consider_my - self control, ordinal
+Q96._S.17.When_I_need_to_make_a_decision_I_try_to_look_for_diffe - self control, ordinal
+Q97._S.18.Usually_I_first_do_the_thing_I_really_like_to_do_even - self control, ordinal
+Q98._S.19.When_I_am_faced_with_a_number_of_things_to_do_I_usuall - self control, ordinal
+Q99._S.20.When_I_am_tired_and_I_have_no_opportunity_to_sleep_I_t - self control, ordinal
+Caste_bhramin - ethnic, binary
+Caste_janjati - binary
+Caste_adhibasi - binary
+Caste_chettri - binary
+Caste_sanyasi - binary
+Caste_Dalit - binary
+Caste_Madhesi - binary
+Caste_Other - binary
+Q101._how_many_people_live_in_this_household - discrete
+x Q104._Why_do_you_want_to_have_this_number_of_childrendont_read_t
+main_sources_of_income_Agriculture - binary
+main_sources_of_income_Own_Business - binary
+main_sources_of_income_Casual_labor - binary
+main_sources_of_income_Formal_Employment_in_company_or_governmen - binary
+main_sources_of_income_Transfers_from_migrants - binary
+Q106._Education_level_of_this_person_that_is_interviewed._How_ma - discrete
+Q107._Education_level_of_your_wife_husband._How_many_years_of_fo - discrete
+target Q108._What_is_your_households_yearly_income_from_agriculture__NP - continuous
+target Q109._What_is_your_households_yearly_income_overall__including_a - continuous
+Q110._Do_you_currently_have_a_loan__if_no0_if_yes_amount_of_mone - discrete
+Q111._G.1._Generally_speaking_would_you_say_that_most_people_can - ordinal
+trust_1 - connected to previous question, binary
+trust_2 - binary
+trust_3 - binary
+trust_4 - binary
+trust_5 - binary
+trust__don’t_know - binary
+target Q112._G.2._Generally_speaking_how_would_you_define_your_farming - ordinal
+target I_am_much_better_than_most_farmers_here - connected to previous question, binary
+target I_am_better_than_most_farmers_here - binary
+target I_am_the_same_level_as_most_farmers_here - binary
+target I_am_not_as_good_as__most_farmers_here - binary
+target I_am_much_worst_than_most_farmers_here - binary
+RISK - I really dislike not knowing what's going to happen, ordinal
+@_dislike_not_knowing_what_is_going_to_happen_1 - binary
+@_dislike_not_knowing_what_is_going_to_happen_2 - binary
+@_dislike_not_knowing_what_is_going_to_happen_3 - binary
+@_dislike_not_knowing_what_is_going_to_happen_4 - binary
+@_dislike_not_knowing_what_is_going_to_happen_5 - binary
+@_dislike_not_knowing_what_is_going_to_happen_6 - binary
+@_dislike_not_knowing_what_is_going_to_happen_7 - binary
+@_dislike_not_knowing_what_is_going_to_happen_8 - binary
+@_dislike_not_knowing_what_is_going_to_happen_9 - binary
+Contraceptives__I_do_not_know_what_contraceptives_are - binary
+Contraceptives__I_know_what_contraceptives_are - binary
+Contraceptives__I_know_what_contraceptives_are_and_do_not_use_th - binary
+Contraceptives__I_know_what_contraceptives_are_and_want_to_use_A - binary
+Contraceptives__I_know_what_contraceptives_are_and_want_to_use_B - binary
+Contraceptives__I_know_what_contraceptives_are_and_want_to_use_C - binary
+Contraceptives__I_know_what_contraceptives_are_I_dont_know_if_we - binary
+Contraceptives__I_know_what_contraceptives_are_and_we_use_them - binary
+Contraceptives__Other - binary
+x Q115._G.4._Please_take_a_picture_of_the_field_try_to_include_irr
+x hope_P
+x hope_A
+hope - sum of hope answers, discrete
+positive - sum of positive, discrete
+negative - sum of negatives, discrete
+PN - positive negative score, continuous
+sc3 - question 3 of self control, ordinal
+sc5 - question 5 of self control, ordinal
+sc6 - question 6 of self control, ordinal
+sc7 - ordinal
+sc9 - ordinal
+sc11 - ordinal
+sc18 - ordinal
+Distance - continuous
+Practices_AV - average of sustainable farming practices, ordinal
+target TOTAL_AREA - continuous
+target INCOME_AG_PER_AREA - continuous
+self_control - the score, discrete
+Zself_control - continuous
+Zhope - continuous
+ZPractices_AV - continuous
+Zinformation - continuous
+ZSex_male1 - continuous
+ZQ5._Age_years - continuous
+ZQ106._Education_level_of_this_person_that_is_interviewed._How_m - continuous
+ZQ101._how_many_people_live_in_this_household - continuous
+ZDistance - continuous
+ZCaste_bhramin - continuous
+ZCaste_janjati - continuous
+ZCaste_adhibasi - continuous
+ZCaste_chettri - continuous
+ZCaste_sanyasi - continuous
+ZCaste_Dalit - continuous
+ZCaste_Madhesi - continuous
+ZCaste_Other - continuous
+
+what is
+Distance 
+Z_SC_X_Z_INF
+Z_SC_X_INF
+V1 - version
+
