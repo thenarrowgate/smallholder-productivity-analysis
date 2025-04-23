@@ -85,9 +85,9 @@ x perspective_28_49_70
 x prudence_60_64_67
 x Zest34_44_69
 x Aver_CS
-Q60._A.1._How_much_land_that_is_your_own_do_you_cultivate_hectar - continuous
-Q61._A.2._How_much_land_that_is_rentedleased_do_you_cultivate_he - continuous
-Q62._A.3._On_how_much_land_do_you_grow_vegetables_hectare - continuous
+t Q60._A.1._How_much_land_that_is_your_own_do_you_cultivate_hectar - continuous
+t Q61._A.2._How_much_land_that_is_rentedleased_do_you_cultivate_he - continuous
+t Q62._A.3._On_how_much_land_do_you_grow_vegetables_hectare - continuous
 Q63._A.4.CROP_Rice - binary
 Q63._A.4.CROP_Fruit - binary
 Q63._A.4.CROP_Vegetables - binary
@@ -188,7 +188,7 @@ t Q90._P.10.yearly_income_from_agriculture__XOF_x000D - continuous
 t Q91._P.11.yearly_income_overall__XOF_x000D - continuous
 t Q92._P.12._Do_you_currently_have_a_loan - continuous
 Q93._S.1._Generally_speaking_would_you_say_that_most_people_can - nominal
-Q94._S.2._Generally_speaking_how_would_you_define_your_farming_i - nominal
+t Q94._S.2._Generally_speaking_how_would_you_define_your_farming_i - nominal
 Q95._S.3_I_really_dislike_not_knowing_what_is_going_to_happen.1 - nominal
 x Picture
 x Survey
