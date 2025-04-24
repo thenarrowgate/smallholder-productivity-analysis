@@ -1,0 +1,223 @@
+x Result_Id
+x Device_Name
+Surveyed_Date - datetime
+Surveyed_Time - datetime
+Surveyed_End_Date - datetime
+x Incomplete - binary
+x Location_Latitude
+x Location_Longitude
+x Location_Altitude
+x Location_Accuracy
+Latitude - continuous
+Longitude - continuous
+Altitude - continuous
+Accuracy - continuous
+x Location_Status
+x Extra_Information
+x Q2._What_is_the_date_and_time_now
+x Q3._Name_of_farmer
+Q4._P.1._Phone_Number - phone number, nominal
+Q5._P.2._Age - continuous
+x Q6._P.3._Arrondissement
+Q7._P.3.1._name_of_village - nominal
+x compatibility
+x Feasibility
+x Hard_to_use_drip
+Q11._H.1._I_can_think_of_many_ways_to_get_out_of_a_jam - ordinal
+Q12._H.2._I_energetically_pursue_my_goals._x000D - ordinal
+Q13._H.3._I_feel_tired_most_of_the_time._x000D - ordinal
+Q14._H.4._There_are_lots_of_ways_around_any_problem._x000D - ordinal
+Q15._H.5._I_am_easily_downed_in_an_argument._x000D - ordinal
+Q16._H.6._I_can_think_of_many_ways_to_get_the_things_in_life_tha - ordinal
+Q17._H.7._I_worry_about_my_health._x000D - ordinal
+Q18._H.8._Even_when_others_get_discouraged_I_know_I_can_find_a_w - ordinal
+Q19._H.9._My_past_experiences_have_prepared_me_well_for_my_futur - ordinal
+Q20._H.10._I’ve_been_pretty_successful_in_life - ordinal
+Q21._H.11._I_usually_find_myself_worrying_about_something - ordinal
+Q22._H.12._I_meet_the_goals_that_I_set_for_myself._x000D - ordinal
+x Hope_a
+x Hope_p
+Hope_t - continuous
+Q24._C.1.1I_have_taken_frequent_stands_in_the_face_of_strong_opp - ordinal
+Q25._C.2.2I_never_quit_a_task_before_it_is_done - ordinal
+Q26._C.3.3I_always_keep_my_promises - ordinal
+Q27._C.4.7I_always_finish_what_I_start - ordinal
+Q28._C.5.9As_a_leader_I_treat_everyone_equally_well_regardless_o - ordinal
+Q29._C.6.13I_am_always_busy_with_something_interesting._x000D - ordinal
+Q30._C.7.16One_of_my_strengths_is_helping_a_group_of_people_work - ordinal
+Q31._C.8.20I_must_stand_up_for_what_I_believe_even_if_there_are - ordinal
+Q32._C.9.21I_finish_things_despite_obstacles_in_the_way - ordinal
+Q33._C.10.22Everyones_rights_are_equally_important_to_me - ordinal
+Q34._C.11.25I_am_excited_by_many_different_activities - ordinal
+Q35._C.12.27I_am_always_coming_up_with_new_ways_to_do_things._x0 - ordinal
+Q36._C.13.28People_describe_me_as_wise_beyond_my_years - ordinal
+Q37._C.14.29My_promises_can_be_trusted - ordinal
+Q38._C.15.30I_give_everyone_a_chance - ordinal
+Q39._C.16.31To_be_an_effective_leader_I_treat_everyone_the_same - ordinal
+Q40._C.17.32I_am_an_extremely_grateful_person._x000D - ordinal
+Q41._C.18.34I_look_forward_to_each_new_day._x000D - ordinal
+Q42._C.19.36My_friends_say_that_I_have_lots_of_new_and_different - ordinal
+Q43._C.20.37I_always_stand_up_for_my_beliefs._x000D - ordinal
+Q44._C.21.38I_am_true_to_my_own_values._x000D - ordinal
+Q45._C.22.41_I_think_through_the_consequences_every_time_before - ordinal
+Q46._C.23.44I_have_lots_of_energy - ordinal
+Q47._C.24.45I_can_find_something_of_interest_in_any_situation - ordinal
+Q48._C.25.47Thinking_things_through_is_part_of_who_I_am - ordinal
+Q49._C.26.48I_am_an_original_thinker - ordinal
+Q50._C.27.49I_have_a_mature_view_on_life - ordinal
+Q51._C.28.52I_feel_thankful_for_what_I_have_received_in_life - ordinal
+Q52._C.29.56I_always_weigh_the_pros_and_cons - ordinal
+Q53._C.30.60I_am_a_very_careful_person - ordinal
+Q54._C.31.64I_try_to_have_good_reasons_for_my_important_decision - ordinal
+Q55._C.32.67I_always_make_careful_choices - ordinal
+Q56._C.33.68I_feel_a_profound_sense_of_appreciation_every_day - ordinal
+Q57._C.34.69I_awaken_with_a_sense_of_excitement_about_the_days_p - ordinal
+Q58._C.35.70Others_consider_me_to_be_a_wise_person - ordinal
+Q59._C.36.71I_believe_that_it_is_worth_listening_to_everyones_op - ordinal
+x Bravery_1_20_37
+x creativity27_36_48
+x curiosity_13_25_45
+x Fairness_22_30_71
+x Gratitude_32_52_68
+x Honesty_3_29_38
+x judgment_41_47_56
+x Leadership_9_16_31
+x Perseverance_2_7_21
+x perspective_28_49_70
+x prudence_60_64_67
+x Zest34_44_69
+x Aver_CS
+t Q60._A.1._How_much_land_that_is_your_own_do_you_cultivate_hectar - continuous
+t Q61._A.2._How_much_land_that_is_rentedleased_do_you_cultivate_he - continuous
+t Q62._A.3._On_how_much_land_do_you_grow_vegetables_hectare - continuous
+Q63._A.4.CROP_Rice - binary
+Q63._A.4.CROP_Fruit - binary
+Q63._A.4.CROP_Vegetables - binary
+Q63._A.4.CROP_Sugarcane - binary
+Q63._A.4.CROP_Groundnuts - binary
+Q63._A.4.CROP_Millet - binary
+Q63._A.4.CROP_Maize - binary
+Q63._A.4.CROP_other_cereals - binary
+Q63._A.4.CROP_cotton - binary
+Q63._A.4.CROP_Other - binary
+Q64._A.5.source_seeds_veg_Selfprepared - binary
+Q64._A.5.source_seeds_veg_Bought_from_neighbor - binary
+Q64._A.5.source_seeds_veg_Bought_in_shop - binary
+Q64._A.5.source_seeds_veg_Received_from_NGO_or_from_government - binary
+Q64._A.5.source_seeds_veg_Other - binary
+Q65._A.6._Importedvariety_veg - binary
+Q65._A.6.__Localvariety_veg - binary
+Q65._A.6._Not_surevariety_veg - binary
+Q66._A.7._Yes_Selfprepared_seedlings__seedlings_veg - binary
+Q66._A.7._Yes_Bought_seedlings_from_neighbor_seedlings_veg - binary
+Q66._A.7._Yes_Bought_seedlings__in_shop_seedlings_veg - binary
+Q66._A.7._No_seedlings_veg - binary
+Q67._A.8._Yes_Chemical_fertilizer - binary
+Q67._A.8.__Yes_Manur_fertilizer - binary
+Q67._A.8.__No_fertilizer - binary
+x fertilizer_type_1chem_2man
+x Q68._A.8.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
+Q69._A.9.__Yes1_do_you_use_pesticides_or_herbicides_on_this_plot - binary
+x Q70._A.9.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
+t Q71._A.10._How_much_VEGETABLES_do_you_harvest_per_year_from_this
+Q72._A.11.__Yes_Trade__Have_you_sold_VEGETABLES_since_the_beginn - binary
+Q72._A.11._Yes_to_bana_bana_local_trader_e___Have_you_sold_VEGET - binary
+Q72._A.11._other__Have_you_sold_VEGETABLES_since_the_beginning_o - binary
+Q73._A.12.__tractor_do_you_use_machinery__equipment_on_the_plot - binary
+Q73._A.12.__seeder_semoir_do_you_use_machinery__equipment_on_the - binary
+Q73._A.12.__plow_charrue__do_you_use_machinery__equipment_on_the - binary
+Q73._A.12._draft_animals_for_example_oxen__do_you_use_machinery - binary
+Q73._A.12.__pulvarisateur_sprayer_do_you_use_machinery__equipmen - binary
+Q73._A.12._cart__do_you_use_machinery__equipment_on_the_plot - binary
+Q73._A.12._Daba__do_you_use_machinery__equipment_on_the_plot - binary
+Q73._A.12.__Non_do_you_use_machinery__equipment_on_the_plot - binary
+Q73._A.12._Hoe_sine__do_you_use_machinery__equipment_on_the_plot - binary
+Q73._A.12._pump__do_you_use_machinery__equipment_on_the_plot - binary
+Q74._A.13.__Cover_crops_a_crop_grown_for_the_protection_and_enri - binary
+Q74._A.13.__intercropping_grow_a_crop_among_plants_of_a_differen - binary
+Q74._A.13._manuring_animal_dung_used_for_fertilizing_land__do_yo - binary
+Q74._A.13._Crop_rotation_growing_different_types_of_crops_in_the - binary
+x Q75._A.13.1._for_surveyor_do_not_ask_farmer Look_in_the_fi
+Q76._I.1.yes1__in_the_past_12_months_did_you_receive_any_informa - binary
+Q77._I.2_Government___from_who__select_all_x000D - binary
+Q77._I.2__NGOs__from_who__select_all_x000D - binary
+Q77._I.2__Agriculture_cooperative___from_who__select_all_x000D - binary
+Q77._I.2_Groupmant__Association__from_who__select_all_x000D - binary
+Q77._I.2_Other__from_who__select_all_x000D - binary
+Q78._I.3._Please_specify_the_names_of_organizations - nominal
+Yes_drip_irrigation__Q79._I.4.receive_anything - binary
+Yes_fertilizer_chemical__Q79._I.4.receive_anything - binary
+Yes_pesticide__Q79._I.4.receive_anything - binary
+Yes_herbicide_Q79._I.4.receive_anything - binary
+Yes_seeds__Q79._I.4.receive_anything - binary
+Yes_seedlings__Q79._I.4.receive_anything - binary
+Yes_water_pump_Q79._I.4.receive_anything - binary
+x No_Q79._I.4.receive_anything
+x otherQ79._I.4.receive_anything
+I_look_at_the_weather_by_my_self_Q80._A.14_plow - binary
+I_have_different_reasons_that_dont_have_to_do_with_the_weather - binary
+weather_from_radio_Q80._A.14._plow - binary
+weather_from_TV_Q80._A.14._plow - binary
+I_look_at_the_weather_by_my_self_Q81._A.15._sowing - binary
+I_have_different_reasons_that_dont_have_to_do_with_the_weather_A - binary
+weather_from_radio_Q81._A.15._sowing - binary
+weather_from_TV_Q81._A.15._sowing - binary
+Q82._A.16.__surface_irrigation - binary
+Q82._A.16._Drip_irrigation_irrigation - binary
+x Q82._A.16.__Movable_sprinklers_irrigation
+x Q82._A.16._Lowland_irrigation__dam_dyke_water_intake__What_type
+Q82._A.16._Sprinklers_irrigation - binary
+x Q83._A.17.1._for_surveyor_do_not_ask_farmer Look_in_the_fi
+Q84._A.17.2.years_using_drip_irrigation_if_non_0 - continuous
+Q85._P.5._Group - nominal
+x Q_Group
+Q86._P.6._Sex__male1 - binary
+Q87._P.7._how_many_people__live_in_this_household - continuous
+x Q88._P.8.__Agriculture_main_sources_of_income
+Q88._P.8.__Own_Business_main_sources_of_income - binary
+x Q88._P.8.__Casual_labor_main_sources_of_income
+Q88._P.8.__Formal_Employment_in_company_or_government_main_sourc - binary
+Q88._P.8.__Transfers_from_migrants_main_sources_of_income - binary
+Q89._P.9.__Primary_Education - binary
+Q89._P.9.__Secondary_Education - binary
+Q89._P.9.__University_Education - binary
+Q89._P.9.__other_Education - binary
+x primary_education
+x education
+educatio_01 - binary
+education_years - nominal
+t Q90._P.10.yearly_income_from_agriculture__XOF_x000D - continuous
+t Q91._P.11.yearly_income_overall__XOF_x000D - continuous
+t Q92._P.12._Do_you_currently_have_a_loan - continuous
+Q93._S.1._Generally_speaking_would_you_say_that_most_people_can - nominal
+t Q94._S.2._Generally_speaking_how_would_you_define_your_farming_i - nominal
+Q95._S.3_I_really_dislike_not_knowing_what_is_going_to_happen.1 - nominal
+x Picture
+x Survey
+x Dis_theis_KM
+x Dis_dakar_KM
+x ZQ91._P.11.yearly_income_overall__XOF_x000D
+x ZHope_t
+x ZQ5._P.2._Age
+x ZDis_theis_KM
+x sources_of_income
+x Zsources_of_income
+x Zeducation
+x Age_education
+x ZQ87._P.7._how_many_people__live_in_this_household
+x ZQ86._P.6._Sex__male1
+x ZQ85._P.5._Group
+x total_land
+x Ztotal_land
+x ZQ90._P.10.yearly_income_from_agriculture__XOF_x000D
+x ZFeasibility
+x Zcompatibility
+x ZSco01
+x Zeducation_years
+x Group
+x Wolof
+x Mandinka
+x Other
+x Pular
+x Serer
+x Soninke
