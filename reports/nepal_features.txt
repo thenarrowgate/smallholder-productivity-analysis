@@ -9,10 +9,10 @@ Surveyed - date, temporal
 End - end, temporal
 how_long_was_the_survey - how many minutes, temporal
 x Incomplete
-Location_Latitude - latitude, continuous
-Location_Longitude - longitude, continuous
-Location_Altitude - altitude, continuous
-Location_Accuracy - accuracy, continuous
+x Location_Latitude - latitude, continuous
+x Location_Longitude - longitude, continuous
+x Location_Altitude - altitude, continuous
+x Location_Accuracy - accuracy, continuous
 Latitude - latitude, continuous
 Longitude - longitude, continuous
 Altitude - altitude, continuous

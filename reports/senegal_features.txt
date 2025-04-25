@@ -20,8 +20,6 @@ Q4._P.1._Phone_Number - phone number, nominal
 Q5._P.2._Age - continuous
 x Q6._P.3._Arrondissement
 Q7._P.3.1._name_of_village - nominal
-x compatibility
-x Feasibility
 x Hard_to_use_drip
 Q11._H.1._I_can_think_of_many_ways_to_get_out_of_a_jam - ordinal
 Q12._H.2._I_energetically_pursue_my_goals._x000D - ordinal
