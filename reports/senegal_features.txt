@@ -4,10 +4,10 @@ Surveyed_Date - datetime
 Surveyed_Time - datetime
 Surveyed_End_Date - datetime
 x Incomplete - binary
-x Location_Latitude
-x Location_Longitude
-x Location_Altitude
-x Location_Accuracy
+Location_Latitude
+Location_Longitude
+Location_Altitude
+Location_Accuracy
 Latitude - continuous
 Longitude - continuous
 Altitude - continuous
@@ -16,9 +16,9 @@ x Location_Status
 x Extra_Information
 x Q2._What_is_the_date_and_time_now
 x Q3._Name_of_farmer
-Q4._P.1._Phone_Number - phone number, nominal
+Q4._P.1._Phone_Number - nominal
 Q5._P.2._Age - continuous
-x Q6._P.3._Arrondissement
+Q6._P.3._Arrondissement
 Q7._P.3.1._name_of_village - nominal
 x Hard_to_use_drip
 Q11._H.1._I_can_think_of_many_ways_to_get_out_of_a_jam - ordinal
@@ -191,7 +191,7 @@ Q93._S.1._Generally_speaking_would_you_say_that_most_people_can - nominal
 t Q94._S.2._Generally_speaking_how_would_you_define_your_farming_i - nominal
 Q95._S.3_I_really_dislike_not_knowing_what_is_going_to_happen.1 - nominal
 x Picture
-x Survey
+Survey
 x Dis_theis_KM
 x Dis_dakar_KM
 x ZQ91._P.11.yearly_income_overall__XOF_x000D
@@ -212,7 +212,7 @@ x ZFeasibility
 x Zcompatibility
 x ZSco01
 x Zeducation_years
-x Group
+Group
 x Wolof
 x Mandinka
 x Other
