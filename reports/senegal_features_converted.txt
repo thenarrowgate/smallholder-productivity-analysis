@@ -1,0 +1,237 @@
+x Result_Id
+x Device_Name
+Q2-Surveyed_Date-time
+Q2-Surveyed_Time-time
+Q#-Surveyed_End_Date-time
+x Incomplete
+Q1-Location_Latitude-continuous
+Q1-Location_Longitude-continuous
+Q1-Location_Altitude-continuous
+Q1-Location_Accuracy-continuous
+Q1-Latitude-continuous
+Q1-Longitude-continuous
+Q1-Altitude-continuous
+Q1-Accuracy-continuous
+x Location_Status
+x Extra_Information
+x Q2._What_is_the_date_and_time_now
+x Q3._Name_of_farmer
+Q4-Phone_Number-nominal
+Q5-Age-continuous
+Q6-Arrondissement-nominal
+Q7-name_of_village-nominal
+x compatibility
+x Feasibility
+x Hard_to_use_drip
+Q11-Hope_1_I_can_think_of_many_ways_to_get_out_of_a_jam-ordinal
+Q12-Hope_2_I_energetically_pursue_my_goals-ordinal
+Q13-Hope_3_I_feel_tired_most_of_the_time-ordinal
+Q14-Hope_4_There_are_lots_of_ways_around_any_problem-ordinal
+Q15-Hope_5_I_am_easily_downed_in_an_argument-ordinal
+Q16-Hope_6_I_can_think_of_many_ways_to_get_the_things_in_life_that_are_important_to_me-ordinal
+Q17-Hope_7_I_worry_about_my_health-ordinal
+Q18-Hope_8_Even_when_others_get_discouraged_I_know_I_can_find_a_way-ordinal
+Q19-Hope_9_My_past_experiences_have_prepared_me_well_for_my_future-ordinal
+Q20-Hope_10_Ive_been_pretty_successful_in_life-ordinal
+Q21-Hope_11_I_usually_find_myself_worrying_about_something-ordinal
+Q22-Hope_12_I_meet_the_goals_that_I_set_for_myself-ordinal
+x Hope_a
+x Hope_p
+Q#-Hope_total-continuous
+Q24-Stand_up_in_face_of_opposition-ordinal
+Q25-Never_quit_task_before_done-ordinal
+Q26-Always_keep_promises-ordinal
+Q27-Always_finish_what_I_start-ordinal
+Q28-Leader_treats_everyone_equally-ordinal
+Q29-Always_busy_with_something_interesting-ordinal
+Q30-Strength_help_group_work_together-ordinal
+Q31-Must_stand_up_for_beliefs-ordinal
+Q32-Finish_things_despite_obstacles-ordinal
+Q33-Everyones_rights_equally_important-ordinal
+Q34-Excited_by_many_activities-ordinal
+Q35-Always_coming_up_with_new_ways-ordinal
+Q36-People_describe_me_as_wise-ordinal
+Q37-Promises_can_be_trusted-ordinal
+Q38-Give_everyone_a_chance-ordinal
+Q39-Effective_leader_treats_same-ordinal
+Q40-Extremely_grateful_person-ordinal
+Q41-Look_forward_to_each_new_day-ordinal
+Q42-Friends_say_I_have_many_ideas-ordinal
+Q43-Always_stand_up_for_beliefs-ordinal
+Q44-True_to_own_values-ordinal
+Q45-Think_through_consequences_before_acting-ordinal
+Q46-Have_lots_of_energy-ordinal
+Q47-Find_interest_in_any_situation-ordinal
+Q48-Thinking_things_through_is_part_of_me-ordinal
+Q49-Original_thinker-ordinal
+Q50-Mature_view_on_life-ordinal
+Q51-Feel_thankful_for_what_I_have-ordinal
+Q52-Always_weigh_pros_and_cons-ordinal
+Q53-Very_careful_person-ordinal
+Q54-Try_to_have_good_reasons_for_decisions-ordinal
+Q55-Always_make_careful_choices-ordinal
+Q56-Feel_profound_appreciation_daily-ordinal
+Q57-Awaken_with_excitement-ordinal
+Q58-Others_consider_me_wise-ordinal
+Q59-Worth_listening_to_everyones_opinion-ordinal
+x Bravery_1_20_37
+x Creativity_27_36_48
+x Curiosity_13_25_45
+x Fairness_22_30_71
+x Gratitude_32_52_68
+x Honesty_3_29_38
+x Judgment_41_47_56
+x Leadership_9_16_31
+x Perseverance_2_7_21
+x Perspective_28_49_70
+x Prudence_60_64_67
+x Zest_34_44_69
+x Average_CS
+Q60-Land_owned_cultivated_ha-continuous
+Q61-Land_rented_cultivated_ha-continuous
+Q62-Land_grow_vegetables_ha-continuous
+Q63-CROP_Rice-binary-1
+Q63-CROP_Fruit-binary-2
+Q63-CROP_Vegetables-binary-3
+Q63-CROP_Sugarcane-binary-4
+Q63-CROP_Groundnuts-binary-5
+Q63-CROP_Millet-binary-6
+Q63-CROP_Maize-binary-7
+Q63-CROP_Other_cereals-binary-8
+Q63-CROP_Cotton-binary-9
+Q63-CROP_Other-binary-10
+Q64-Seed_source_Selfprepared-binary-1
+Q64-Seed_source_Bought_neighbor-binary-2
+Q64-Seed_source_Bought_shop-binary-3
+Q64-Seed_source_Received_NGO_govt-binary-4
+Q64-Seed_source_Other-binary-5
+Q65-Variety_Imported-binary-1
+Q65-Variety_Local-binary-2
+Q65-Variety_Not_sure-binary-3
+Q66-Seedlings_Selfprepared-binary-1
+Q66-Seedlings_Bought_neighbor-binary-2
+Q66-Seedlings_Bought_shop-binary-3
+Q66-Seedlings_No-binary-4
+Q67-Fertilizer_Chemical-binary-1
+Q67-Fertilizer_Manure-binary-2
+Q67-Fertilizer_None-binary-3
+x Fertilizer_type_dummy
+x Q68_Surveyor_check_fertilizer
+Q69-Use_pesticide_or_herbicide-binary-1
+x Q70_Surveyor_check_pesticide
+Q71-VEG_harvest_per_year_kg-continuous
+Q72-Sold_VEG_Trade-binary-1
+Q72-Sold_VEG_Local_trader-binary-2
+Q72-Sold_VEG_Other-binary-3
+Q73-Machinery_tractor-binary-1
+Q73-Machinery_seeder-binary-2
+Q73-Machinery_plow-binary-3
+Q73-Machinery_draft_animals-binary-4
+Q73-Machinery_sprayer-binary-5
+Q73-Machinery_cart-binary-6
+Q73-Machinery_daba-binary-7
+Q73-Machinery_none-binary-8
+Q73-Machinery_hoe_sine-binary-9
+Q73-Machinery_pump-binary-10
+Q74-Practice_cover_crops-binary-1
+Q74-Practice_intercropping-binary-2
+Q74-Practice_manuring-binary-3
+Q74-Practice_crop_rotation-binary-4
+x Q75_Surveyor_check_practices
+Q76-Received_agri_info_last_12m-binary-1
+Q77-Info_source_Govt-binary-1
+Q77-Info_source_NGO-binary-2
+Q77-Info_source_Cooperative-binary-3
+Q77-Info_source_Association-binary-4
+Q77-Info_source_Other-binary-5
+Q78-Names_of_organizations-nominal
+Q79-Yes_drip_irrigation-binary-1
+Q79-Yes_fertilizer_chemical-binary-2
+Q79-Yes_pesticide-binary-3
+Q79-Yes_herbicide-binary-4
+Q79-Yes_seeds-binary-5
+Q79-Yes_seedlings-binary-6
+Q79-Yes_water_pump-binary-7
+x Q79_No_receive_anything
+x Q79_Other_receive_anything
+Q80-Plow_weather_self-binary-1
+Q80-Plow_weather_reason_other-binary-2
+Q80-Plow_weather_radio-binary-3
+Q80-Plow_weather_TV-binary-4
+Q80-Plow_weather_SMS-binary-5
+Q80-Plow_weather_app-binary-6
+Q80-Plow_weather_call_service-binary-7
+Q80-Plow_weather_email-binary-8
+Q80-Plow_weather_website-binary-9
+Q81-Sow_weather_self-binary-1
+Q81-Sow_reason_other-binary-2
+Q81-Sow_radio-binary-3
+Q81-Sow_TV-binary-4
+Q81-Sow_SMS-binary-5
+Q81-Sow_app-binary-6
+Q81-Sow_call_service-binary-7
+Q81-Sow_email-binary-8
+Q81-Sow_website-binary-9
+Q82-Irrigation_surface-binary-1
+Q82-Irrigation_drip-binary-2
+Q82-Irrigation_sprinklers-binary-3
+x Q82_Irrigation_movable_sprinklers
+x Q82_Irrigation_lowland
+Q82-Irrigation_pivots-binary-4
+Q82-Irrigation_pump-binary-5
+Q82-Irrigation_none-binary-6
+x Q83_Surveyor_check_irrigation
+Q84-Years_using_drip_irrigation-continuous
+Q85-Group-nominal
+x Q_Group_dummy
+Q86-Sex_male-binary-1
+Q87-Household_size-continuous
+x Q88_Agriculture_income_source
+Q88-Own_business_income_source-binary-1
+x Q88._P.8.__Casual_labor_main_sources_of_income
+Q88-Formal_employment_income_source-binary-2
+Q88-Transfers_from_migrants_income_source-binary-3
+Q89-Primary_education-binary-1
+Q89-Secondary_education-binary-2
+Q89-University_education-binary-3
+Q89-Other_education-binary-4
+x primary_education
+x education_dummy
+Q#-Has_Education_Yes_No-binary-1
+Q#-Education_years-continuous
+Q90-Yearly_income_agriculture_XOF-continuous
+Q91-Yearly_income_overall_XOF-continuous
+Q92-Current_loan_amount_XOF-continuous
+Q93-Trust_most_people_nominal
+Q94-Farming_level_relative_nominal
+Q95-Dislike_not_knowing_future_nominal
+x Picture
+Q#-Survey_duration-time
+x Distance_Thies_KM
+x Distance_Dakar_KM
+x Z_Yearly_income_overall
+x Z_Hope_total
+x Z_Age
+x Z_Distance_Thies
+x Sources_of_income_list
+x Z_Sources_of_income
+x Z_Education
+x Age_Education_interaction
+x Z_Household_size
+x Z_Sex_male
+x Z_Group
+x Total_land_ha
+x Z_Total_land_ha
+x Z_Yearly_income_agriculture
+x Z_Feasibility
+x Z_Compatibility
+x Z_Sco01
+x Z_Education_years
+x Group
+x Wolof
+x Mandinka
+x Other_ethnicity
+x Pular
+x Serer
+x Soninke
+
