@@ -158,28 +158,15 @@ Q80-Plow_weather_self-binary-1
 Q80-Plow_weather_reason_other-binary-2
 Q80-Plow_weather_radio-binary-3
 Q80-Plow_weather_TV-binary-4
-Q80-Plow_weather_SMS-binary-5
-Q80-Plow_weather_app-binary-6
-Q80-Plow_weather_call_service-binary-7
-Q80-Plow_weather_email-binary-8
-Q80-Plow_weather_website-binary-9
 Q81-Sow_weather_self-binary-1
 Q81-Sow_reason_other-binary-2
 Q81-Sow_radio-binary-3
 Q81-Sow_TV-binary-4
-Q81-Sow_SMS-binary-5
-Q81-Sow_app-binary-6
-Q81-Sow_call_service-binary-7
-Q81-Sow_email-binary-8
-Q81-Sow_website-binary-9
 Q82-Irrigation_surface-binary-1
 Q82-Irrigation_drip-binary-2
-Q82-Irrigation_sprinklers-binary-3
 x Q82_Irrigation_movable_sprinklers
 x Q82_Irrigation_lowland
-Q82-Irrigation_pivots-binary-4
-Q82-Irrigation_pump-binary-5
-Q82-Irrigation_none-binary-6
+Q82-Irrigation_sprinklers-binary-3
 x Q83_Surveyor_check_irrigation
 Q84-Years_using_drip_irrigation-continuous
 Q85-Group-nominal
@@ -202,9 +189,9 @@ Q#-Education_years-continuous
 Q90-Yearly_income_agriculture_XOF-continuous
 Q91-Yearly_income_overall_XOF-continuous
 Q92-Current_loan_amount_XOF-continuous
-Q93-Trust_most_people_nominal
-Q94-Farming_level_relative_nominal
-Q95-Dislike_not_knowing_future_nominal
+Q93-Trust_most_people-ordinal
+Q94-Farming_level_relative-ordinal
+Q95-Dislike_not_knowing_future-ordinal
 x Picture
 Q#-Survey_duration-time
 x Distance_Thies_KM

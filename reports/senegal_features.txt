@@ -1,9 +1,9 @@
-x Result_Id
-x Device_Name
+Result_Id
+Device_Name
 Surveyed_Date - datetime
 Surveyed_Time - datetime
 Surveyed_End_Date - datetime
-x Incomplete - binary
+Incomplete - binary
 Location_Latitude
 Location_Longitude
 Location_Altitude
@@ -12,15 +12,17 @@ Latitude - continuous
 Longitude - continuous
 Altitude - continuous
 Accuracy - continuous
-x Location_Status
-x Extra_Information
-x Q2._What_is_the_date_and_time_now
-x Q3._Name_of_farmer
+Location_Status
+Extra_Information
+Q2._What_is_the_date_and_time_now
+Q3._Name_of_farmer
 Q4._P.1._Phone_Number - nominal
 Q5._P.2._Age - continuous
 Q6._P.3._Arrondissement
 Q7._P.3.1._name_of_village - nominal
-x Hard_to_use_drip
+compatibility
+Feasibility
+Hard_to_use_drip
 Q11._H.1._I_can_think_of_many_ways_to_get_out_of_a_jam - ordinal
 Q12._H.2._I_energetically_pursue_my_goals._x000D - ordinal
 Q13._H.3._I_feel_tired_most_of_the_time._x000D - ordinal
@@ -33,8 +35,8 @@ Q19._H.9._My_past_experiences_have_prepared_me_well_for_my_futur - ordinal
 Q20._H.10._I’ve_been_pretty_successful_in_life - ordinal
 Q21._H.11._I_usually_find_myself_worrying_about_something - ordinal
 Q22._H.12._I_meet_the_goals_that_I_set_for_myself._x000D - ordinal
-x Hope_a
-x Hope_p
+Hope_a
+Hope_p
 Hope_t - continuous
 Q24._C.1.1I_have_taken_frequent_stands_in_the_face_of_strong_opp - ordinal
 Q25._C.2.2I_never_quit_a_task_before_it_is_done - ordinal
@@ -72,22 +74,22 @@ Q56._C.33.68I_feel_a_profound_sense_of_appreciation_every_day - ordinal
 Q57._C.34.69I_awaken_with_a_sense_of_excitement_about_the_days_p - ordinal
 Q58._C.35.70Others_consider_me_to_be_a_wise_person - ordinal
 Q59._C.36.71I_believe_that_it_is_worth_listening_to_everyones_op - ordinal
-x Bravery_1_20_37
-x creativity27_36_48
-x curiosity_13_25_45
-x Fairness_22_30_71
-x Gratitude_32_52_68
-x Honesty_3_29_38
-x judgment_41_47_56
-x Leadership_9_16_31
-x Perseverance_2_7_21
-x perspective_28_49_70
-x prudence_60_64_67
-x Zest34_44_69
-x Aver_CS
-t Q60._A.1._How_much_land_that_is_your_own_do_you_cultivate_hectar - continuous
-t Q61._A.2._How_much_land_that_is_rentedleased_do_you_cultivate_he - continuous
-t Q62._A.3._On_how_much_land_do_you_grow_vegetables_hectare - continuous
+Bravery_1_20_37
+creativity27_36_48
+curiosity_13_25_45
+Fairness_22_30_71
+Gratitude_32_52_68
+Honesty_3_29_38
+judgment_41_47_56
+Leadership_9_16_31
+Perseverance_2_7_21
+perspective_28_49_70
+prudence_60_64_67
+Zest34_44_69
+Aver_CS
+Q60._A.1._How_much_land_that_is_your_own_do_you_cultivate_hectar - continuous
+Q61._A.2._How_much_land_that_is_rentedleased_do_you_cultivate_he - continuous
+Q62._A.3._On_how_much_land_do_you_grow_vegetables_hectare - continuous
 Q63._A.4.CROP_Rice - binary
 Q63._A.4.CROP_Fruit - binary
 Q63._A.4.CROP_Vegetables - binary
@@ -113,11 +115,11 @@ Q66._A.7._No_seedlings_veg - binary
 Q67._A.8._Yes_Chemical_fertilizer - binary
 Q67._A.8.__Yes_Manur_fertilizer - binary
 Q67._A.8.__No_fertilizer - binary
-x fertilizer_type_1chem_2man
-x Q68._A.8.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
+fertilizer_type_1chem_2man
+Q68._A.8.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
 Q69._A.9.__Yes1_do_you_use_pesticides_or_herbicides_on_this_plot - binary
-x Q70._A.9.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
-t Q71._A.10._How_much_VEGETABLES_do_you_harvest_per_year_from_this
+Q70._A.9.1._for_surveyor_do_not_ask_farmer Look_in_the_fie
+Q71._A.10._How_much_VEGETABLES_do_you_harvest_per_year_from_this
 Q72._A.11.__Yes_Trade__Have_you_sold_VEGETABLES_since_the_beginn - binary
 Q72._A.11._Yes_to_bana_bana_local_trader_e___Have_you_sold_VEGET - binary
 Q72._A.11._other__Have_you_sold_VEGETABLES_since_the_beginning_o - binary
@@ -135,7 +137,7 @@ Q74._A.13.__Cover_crops_a_crop_grown_for_the_protection_and_enri - binary
 Q74._A.13.__intercropping_grow_a_crop_among_plants_of_a_differen - binary
 Q74._A.13._manuring_animal_dung_used_for_fertilizing_land__do_yo - binary
 Q74._A.13._Crop_rotation_growing_different_types_of_crops_in_the - binary
-x Q75._A.13.1._for_surveyor_do_not_ask_farmer Look_in_the_fi
+Q75._A.13.1._for_surveyor_do_not_ask_farmer Look_in_the_fi
 Q76._I.1.yes1__in_the_past_12_months_did_you_receive_any_informa - binary
 Q77._I.2_Government___from_who__select_all_x000D - binary
 Q77._I.2__NGOs__from_who__select_all_x000D - binary
