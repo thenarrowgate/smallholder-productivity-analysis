@@ -1,73 +1,73 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36" version="26.2.13">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36" version="27.0.9">
   <diagram name="Page-1" id="FxISBaHx2wQaiflEiIXc">
-    <mxGraphModel dx="2068" dy="2237" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="784" dy="2236" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-1" value="" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-1" value="" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="805" y="-698" width="460" height="264" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-2" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px; color: light-dark(rgb(0, 0, 0), rgb(0, 0, 0));&quot;&gt;הנתונים מסנגל&lt;/font&gt;&lt;/b&gt;" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;fillColor=light-dark(#FFFFFF,#FDEF42);strokeColor=light-dark(#000000,#00853F);strokeWidth=3;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-2" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px; color: light-dark(rgb(0, 0, 0), rgb(0, 0, 0));&quot;&gt;הנתונים מסנגל&lt;/font&gt;&lt;/b&gt;" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;fillColor=light-dark(#FFFFFF,#FDEF42);strokeColor=light-dark(#000000,#00853F);strokeWidth=3;" parent="1" vertex="1">
           <mxGeometry x="263" y="-121" width="183" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-3" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0;entryDx=183;entryDy=50;entryPerimeter=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-18" target="reeLDZCqM8ZDpDuMpRiX-2">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-3" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0;entryDx=183;entryDy=50;entryPerimeter=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-18" target="reeLDZCqM8ZDpDuMpRiX-2" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="531" y="-12" as="sourcePoint" />
             <mxPoint x="581" y="-62" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-4" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הנתונים מנפאל&lt;/font&gt;&lt;/b&gt;" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;fillColor=light-dark(#FFFFFF,#DC143C);strokeColor=light-dark(#FFFFFF,#003893);perimeterSpacing=0;strokeWidth=3;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-4" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הנתונים מנפאל&lt;/font&gt;&lt;/b&gt;" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;fillColor=light-dark(#FFFFFF,#DC143C);strokeColor=light-dark(#FFFFFF,#003893);perimeterSpacing=0;strokeWidth=3;" parent="1" vertex="1">
           <mxGeometry x="716" y="-116" width="183" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-5" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;אקלים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים נאספו &lt;b&gt;בין נובמבר 2018 לינואר 2019&lt;/b&gt; — תקופה&lt;div&gt;&amp;nbsp;שהיא &lt;b&gt;אחרי עונת המונסון ובתחילת העונה הקרה&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;nbsp;&lt;/b&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;והיבשה&lt;/b&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt; בנפאל.&lt;/span&gt;&lt;/div&gt;&lt;div&gt;בנוסף, היית עונת מונסון כבדה יחסית בקיץ 2018&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;בנוסף, יש המון מים מגשם לכן&lt;div&gt;לא משתמשים בטפטפות&lt;/div&gt;&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-5" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;אקלים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים נאספו &lt;b&gt;בין נובמבר 2018 לינואר 2019&lt;/b&gt; — תקופה&lt;div&gt;&amp;nbsp;שהיא &lt;b&gt;אחרי עונת המונסון ובתחילת העונה הקרה&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;nbsp;&lt;/b&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;והיבשה&lt;/b&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt; בנפאל.&lt;/span&gt;&lt;/div&gt;&lt;div&gt;בנוסף, היית עונת מונסון כבדה יחסית בקיץ 2018&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;בנוסף, יש המון מים מגשם לכן&lt;div&gt;לא משתמשים בטפטפות&lt;/div&gt;&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
           <mxGeometry x="856" y="-271" width="330" height="199" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-6" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0;entryDx=183;entryDy=50;entryPerimeter=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-5" target="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-6" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0;entryDx=183;entryDy=50;entryPerimeter=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-5" target="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="984" y="-7" as="sourcePoint" />
             <mxPoint x="1034" y="-57" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-7" value="&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;דגימת הנתונים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;בנוסף &lt;/b&gt;לארבעת&lt;div&gt;הקריטריונים להגדרת מיהו&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;חקלאי קטן, לא השתתפו&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;nbsp;בתוכנית לימודי חקלאות מחוץ&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;לנפאל.&lt;/span&gt;&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-7" value="&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;דגימת הנתונים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;בנוסף &lt;/b&gt;לארבעת&lt;div&gt;הקריטריונים להגדרת מיהו&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;חקלאי קטן, לא השתתפו&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;nbsp;בתוכנית לימודי חקלאות מחוץ&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;לנפאל.&lt;/span&gt;&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="813" y="-415" width="179" height="169" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-8" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.623;entryY=-0.037;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-7" target="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-8" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.31;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.623;entryY=-0.037;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-7" target="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="658" y="-64" as="sourcePoint" />
             <mxPoint x="708" y="-114" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-9" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הסוקרים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;סוקר אחד שהוא בעצמו&lt;div&gt;חקלאי סקר את&lt;/div&gt;&lt;div&gt;החקלאים&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-9" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הסוקרים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;סוקר אחד שהוא בעצמו&lt;div&gt;חקלאי סקר את&lt;/div&gt;&lt;div&gt;החקלאים&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
           <mxGeometry x="654" y="-421" width="145" height="113" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-10" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=81.5;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-9" target="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-10" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=81.5;entryDy=0;entryPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-9" target="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="657" y="-64" as="sourcePoint" />
             <mxPoint x="707" y="-114" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-11" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הסוקרים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;קבוצה של 3 סוקרים&lt;div&gt;סקרו את החקלאים.&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-11" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הסוקרים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;קבוצה של 3 סוקרים&lt;div&gt;סקרו את החקלאים.&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
           <mxGeometry x="209" y="-376" width="145" height="107" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-12" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=81.5;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-11">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-12" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=81.5;entryDy=0;entryPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-11" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="206" y="-69" as="sourcePoint" />
             <mxPoint x="347" y="-121" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-13" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.993;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=0;entryDy=60;entryPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-2" target="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-13" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.993;exitY=0.8;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=0;entryDy=60;entryPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-2" target="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="579" y="-214" as="sourcePoint" />
             <mxPoint x="529" y="-164" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-14" value="הסקר לנפאל נבנה&lt;div&gt;על הסקר לסנגל&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-14" value="הסקר לנפאל נבנה&lt;div&gt;על הסקר לסנגל&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="515" y="-108" width="145" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-15" value="&lt;div&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;אמינות הנתונים&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים באו מדיווח עצמי&amp;nbsp;&lt;div&gt;של חקלאים בשטח&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-15" value="&lt;div&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;אמינות הנתונים&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים באו מדיווח עצמי&amp;nbsp;&lt;div&gt;של חקלאים בשטח&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="405" y="-589" width="199" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-16" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.705;entryY=-0.017;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;" edge="1" parent="1" target="reeLDZCqM8ZDpDuMpRiX-2">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-16" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.705;entryY=-0.017;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;" parent="1" target="reeLDZCqM8ZDpDuMpRiX-2" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="567" y="-414" as="sourcePoint" />
             <mxPoint x="555" y="-314" as="targetPoint" />
@@ -76,7 +76,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-17" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.299;entryY=-0.004;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;" edge="1" parent="1" target="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-17" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.299;entryY=-0.004;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;" parent="1" target="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="586" y="-415" as="sourcePoint" />
             <mxPoint x="555" y="-314" as="targetPoint" />
@@ -85,100 +85,151 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-18" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;אקלים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים נאספו &lt;b&gt;באפריל&amp;nbsp;&lt;/b&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;שנת 2018&lt;/b&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt; שזו &lt;/span&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;בסוף העונה&amp;nbsp;&lt;/b&gt;&lt;div&gt;&lt;b&gt;היבשה&lt;/b&gt; בסנגל וממש לפני&lt;/div&gt;&lt;div&gt;עונת הגשמים שבדרך כלל מתחילה&lt;/div&gt;&lt;div&gt;ביוני. בתקופה זו החקלאים כבר סיימו את רוב&lt;/div&gt;&lt;div&gt;&amp;nbsp;עיבוד הקרקע והם נמצאים בשלב היערכות לזריעה.&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-18" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;אקלים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;הנתונים נאספו &lt;b&gt;באפריל&amp;nbsp;&lt;/b&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;שנת 2018&lt;/b&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt; שזו &lt;/span&gt;&lt;b style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;בסוף העונה&amp;nbsp;&lt;/b&gt;&lt;div&gt;&lt;b&gt;היבשה&lt;/b&gt; בסנגל וממש לפני&lt;/div&gt;&lt;div&gt;עונת הגשמים שבדרך כלל מתחילה&lt;/div&gt;&lt;div&gt;ביוני. בתקופה זו החקלאים כבר סיימו את רוב&lt;/div&gt;&lt;div&gt;&amp;nbsp;עיבוד הקרקע והם נמצאים בשלב היערכות לזריעה.&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
           <mxGeometry x="408" y="-326" width="330" height="202" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-19" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-19" value="" style="endArrow=none;html=1;rounded=0;" parent="1" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="493.5" y="-415" as="sourcePoint" />
             <mxPoint x="1193" y="-415" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-20" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-15">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-20" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-15" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="597" y="-465" as="sourcePoint" />
             <mxPoint x="514" y="-415" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-21" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;השוואה בין המדינות&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;אוכלוסיות מאוד שונות,&lt;div&gt;לא ניתן להשוות כל כך ממצאים&lt;/div&gt;&lt;div&gt;משני הדאטה-סטים&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-21" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;השוואה בין המדינות&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;אוכלוסיות מאוד שונות,&lt;div&gt;לא ניתן להשוות כל כך ממצאים&lt;/div&gt;&lt;div&gt;משני הדאטה-סטים&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="606" y="-629" width="199" height="160" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-22" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-21">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-22" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-21" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="798" y="-465" as="sourcePoint" />
             <mxPoint x="715" y="-415" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-23" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0;exitDx=101.5;exitDy=80;exitPerimeter=0;strokeColor=light-dark(#FFFFFF,#DC143C);" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-4">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-23" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0;exitDx=101.5;exitDy=80;exitPerimeter=0;strokeColor=light-dark(#FFFFFF,#DC143C);" parent="1" source="reeLDZCqM8ZDpDuMpRiX-4" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="763" y="-64" as="sourcePoint" />
-            <mxPoint x="818" y="907" as="targetPoint" />
+            <mxPoint x="818" y="1380" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-24" value="הגובה הנמוך&lt;div&gt;&amp;nbsp;ביותר בנפאל&lt;/div&gt;&lt;div&gt;&amp;nbsp;הוא 60 מטר&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-24" value="הגובה הנמוך&lt;div&gt;&amp;nbsp;ביותר בנפאל&lt;/div&gt;&lt;div&gt;&amp;nbsp;הוא 60 מטר&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="999" y="922" width="153" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-25" value="החלטנו להוריד את &lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;העמודות&lt;/span&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;Q12._Who_makes_farming_decisions_in_this_holding_Me1&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;type_of_crop_vegetables&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q14._Did_you_participate_in_a_learning_program_abroad_for_exampl&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="882.25" y="27" width="400.75" height="154" as="geometry" />
-        </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-26" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;דגימת הנתונים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;לא נעשה דגימה אקראית של החקלאים אלא דגימת נוחות לפי ארבעה&amp;nbsp;&lt;div&gt;קריטריונים:&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;בעלות על עד 10 דונם של אדמה.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;האדם שמקבל את ההחלטות בנוגע לפעילות החקלאית של משק הבית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;קבלת החלטות חקלאיות אינדיבידואלית ולא קבוצתית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;אחד מהגידולים שלו הם ירקות&lt;/div&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-26" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;דגימת הנתונים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;לא נעשה דגימה אקראית של החקלאים אלא דגימת נוחות לפי ארבעה&amp;nbsp;&lt;div&gt;קריטריונים:&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;בעלות על עד 10 דונם של אדמה.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;האדם שמקבל את ההחלטות בנוגע לפעילות החקלאית של משק הבית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;קבלת החלטות חקלאיות אינדיבידואלית ולא קבוצתית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;אחד מהגידולים שלו הם ירקות&lt;/div&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="860" y="-573" width="363" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-27" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-1">
+        <mxCell id="reeLDZCqM8ZDpDuMpRiX-27" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="reeLDZCqM8ZDpDuMpRiX-1" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="929" y="-175" as="sourcePoint" />
             <mxPoint x="1058" y="-416" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-28" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-25">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-1" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0;exitDx=101.5;exitDy=80;exitPerimeter=0;strokeColor=light-dark(#FFFFFF,#FDEF42);" edge="1" parent="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="1000" y="-175" as="sourcePoint" />
-            <mxPoint x="816" y="104" as="targetPoint" />
+            <mxPoint x="360" y="-41" as="sourcePoint" />
+            <mxPoint x="360" y="1380" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-29" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.55;exitY=0.95;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.909;entryY=-0.009;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-1" target="reeLDZCqM8ZDpDuMpRiX-25">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-2" value="&lt;div&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;הגדרת הפיצ&#39;רים&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;שינינו את פרומט השמות של העמודות לפורמט הבא:&lt;div&gt;Q&amp;lt;question_id&amp;gt;-&amp;lt;name&amp;gt;-&amp;lt;variable_type&amp;gt;-&amp;lt;dummy_number&amp;gt;&lt;/div&gt;&lt;div&gt;וכל משתנה רציף או בדיד או אורדינלי הגדרנו כפיצ&#39;ר נומרי&lt;/div&gt;&lt;div&gt;כל פיצ&#39;ר נומינלי הוגדר כקטגורי&lt;/div&gt;&lt;div&gt;כל פיצ&#39;ר בינארי הוגדר ל-0 אם הוא חסר או המחרוזת 0 או הספרה 0&lt;/div&gt;&lt;div&gt;ול-1 אחרת&lt;/div&gt;&lt;div&gt;כל משתנה קשור לתאריך המרנו ל-&lt;/div&gt;&lt;div&gt;datetime&lt;/div&gt;&lt;div&gt;כל משתנה קשור לאורך זמן המרנו ל&lt;/div&gt;&lt;div&gt;timedelta&lt;/div&gt;&lt;div&gt;לצורך האנליזה הראשונית, כל קבוצה של עמודות בינאריות שהיו&amp;nbsp;&lt;/div&gt;&lt;div&gt;one-hot-encoded&lt;/div&gt;&lt;div&gt;חיברנו בחזרה לעמודה אחת קטגורית&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="387.12" width="400.75" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-3" value="" style="endArrow=classic;html=1;rounded=0;exitX=1.007;exitY=0.386;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-2">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="1000" y="-175" as="sourcePoint" />
-            <mxPoint x="1050" y="-225" as="targetPoint" />
-            <Array as="points">
-              <mxPoint x="1287" y="-234" />
-            </Array>
+            <mxPoint x="786" y="220" as="sourcePoint" />
+            <mxPoint x="820" y="85" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-30" value="" style="endArrow=none;html=1;rounded=0;exitX=0.875;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;curved=1;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-7">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-4" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="1016" y="-175" as="sourcePoint" />
-            <mxPoint x="1194" y="-277" as="targetPoint" />
-            <Array as="points">
-              <mxPoint x="1081" y="-330" />
-            </Array>
+            <mxPoint x="387.13" y="86.5" as="sourcePoint" />
+            <mxPoint x="360" y="87" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-31" value="בגלל שהכילו רק ערך יחיד וגם לא נתנו מידע מעניין הורדנו את העמודות הבאות&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Device_Name&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Incomplete&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;LocationStatus&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;ExtraInformation&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q59._A._for_surveyor_do_not_ask_farmerLook_in_the_field_does_the&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q61._A._for_surveyor_do_not_ask_farmerLook_in_the_field_does_the&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q66._A.For_surveyor_do_not_ask_farmerLook_in_the_field_does_the&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q77._for_surveyor_do_not_ask_farmerLook_in_the_field_Does_the_an&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="880.5" y="228" width="404.25" height="310" as="geometry" />
+        <mxCell id="chYQWTdmyedMdJKKDb4r-5" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;הגדרת מטריקות הפרודוקטיביות&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;המרנו את מדדי השטח (הקטר וביגה) למטר מרובע&amp;nbsp;&lt;/div&gt;&lt;div&gt;המרנו את המטבעות (רופי ופראנק) לדולר&lt;/div&gt;&lt;div&gt;לשני הדאטאסטים יצרנו ארבעה מטריקות לפרודוקטיביות:&lt;/div&gt;&lt;div&gt;1. הכנסה שנתית מחקלאות פר שטח&lt;/div&gt;&lt;div&gt;2. הכנסה שנתית מחקלאות&lt;/div&gt;&lt;div&gt;3. יבול ירקות פר שטח&lt;/div&gt;&lt;div&gt;4. הערכה עצמית של החקלאי על רמת החקלאות שלו&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="384.63" y="270" width="400.75" height="154" as="geometry" />
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-32" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="reeLDZCqM8ZDpDuMpRiX-31">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-6" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-5">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="899" y="25" as="sourcePoint" />
-            <mxPoint x="819" y="383" as="targetPoint" />
+            <mxPoint x="783.5" y="480" as="sourcePoint" />
+            <mxPoint x="817.5" y="347" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-33" value="בגלל שלא נתנו מידע מעניין הודרנו את העמודות הבאות&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Result_Id&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q3._Name_of_farmer&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;hope_P&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;hope_A&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="882.25" y="559" width="403.75" height="149" as="geometry" />
-        </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-34" value="בגלל שלא נוכל \ יכולנו לקרוא את המידע, הורדנו את העמודות הבאות&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q104._Why_do_you_want_to_have_this_number_of_childrendont_read_t&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Q115._G.4._Please_take_a_picture_of_the_field_try_to_include_irr&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="882.25" y="729" width="403.75" height="149" as="geometry" />
-        </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-35" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-7" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="880.5" y="633" as="sourcePoint" />
-            <mxPoint x="818.5" y="633" as="targetPoint" />
+            <mxPoint x="384.63" y="346.5" as="sourcePoint" />
+            <mxPoint x="357.5" y="347" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-36" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-10" value="&lt;div&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;משתני מיקום&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;עבור מיקום החלטנו להשתמש בעמודות בלי הרישא&amp;nbsp;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;Location_&lt;/div&gt;&lt;div&gt;כי עמודות אלו היו חסרות מהנתונים בסנגל&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="384.63" y="473" width="400.75" height="154" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-11" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-10">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="880.5" y="794" as="sourcePoint" />
-            <mxPoint x="818.5" y="794" as="targetPoint" />
+            <mxPoint x="783.5" y="683" as="sourcePoint" />
+            <mxPoint x="817.5" y="550" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-12" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="384.63" y="549.5" as="sourcePoint" />
+            <mxPoint x="357.5" y="550" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-13" value="הודרנו את העמודות&lt;div&gt;&#39;how_many_children...&#39;&lt;/div&gt;&lt;div&gt;מנפאל כי היו חוסרים והמנחה אמרה שכדאי&lt;/div&gt;" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="870" y="640" width="120" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-14" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-13">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="920" y="550" as="sourcePoint" />
+            <mxPoint x="820" y="700" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-15" value="&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;ערכי קיצון&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;עבור ערכי קיצון שנמצאו עבור המטריקות של הפרודוקטיביות הורדנו את אותם חקלאים.&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="384.63" y="680" width="400.75" height="154" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-16" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-15">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="783.5" y="890" as="sourcePoint" />
+            <mxPoint x="817.5" y="757" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-17" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="384.63" y="756.5" as="sourcePoint" />
+            <mxPoint x="357.5" y="757" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-18" value="&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;עמודות קבועות&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;הורדנו כל עמודה בעלת ערך יחיד&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="384.63" y="868" width="400.75" height="154" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-19" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-18">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="783.5" y="1078" as="sourcePoint" />
+            <mxPoint x="817.5" y="945" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-20" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="384.63" y="944.5" as="sourcePoint" />
+            <mxPoint x="357.5" y="945" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-28" value="&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;נורמליזציה&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;נרמלנו את העמודות הנומריים, עשינו&amp;nbsp;&lt;/div&gt;&lt;div&gt;one-hot-encode&lt;/div&gt;&lt;div&gt;לעמודות קטגוריים&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="384.63" y="1060" width="400.75" height="154" as="geometry" />
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-29" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-28">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="783.5" y="1270" as="sourcePoint" />
+            <mxPoint x="817.5" y="1137" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chYQWTdmyedMdJKKDb4r-30" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="384.63" y="1136.5" as="sourcePoint" />
+            <mxPoint x="357.5" y="1137" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>
