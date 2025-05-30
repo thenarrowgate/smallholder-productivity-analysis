@@ -115,9 +115,6 @@
             <mxPoint x="818" y="1380" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="reeLDZCqM8ZDpDuMpRiX-24" value="הגובה הנמוך&lt;div&gt;&amp;nbsp;ביותר בנפאל&lt;/div&gt;&lt;div&gt;&amp;nbsp;הוא 60 מטר&lt;/div&gt;" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="999" y="922" width="153" height="100" as="geometry" />
-        </mxCell>
         <mxCell id="reeLDZCqM8ZDpDuMpRiX-26" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;דגימת הנתונים&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;לא נעשה דגימה אקראית של החקלאים אלא דגימת נוחות לפי ארבעה&amp;nbsp;&lt;div&gt;קריטריונים:&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;בעלות על עד 10 דונם של אדמה.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;האדם שמקבל את ההחלטות בנוגע לפעילות החקלאית של משק הבית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;קבלת החלטות חקלאיות אינדיבידואלית ולא קבוצתית&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;אחד מהגידולים שלו הם ירקות&lt;/div&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="860" y="-573" width="363" height="30" as="geometry" />
         </mxCell>
@@ -187,7 +184,7 @@
             <mxPoint x="820" y="700" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="chYQWTdmyedMdJKKDb4r-15" value="&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;ערכי קיצון&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;עבור ערכי קיצון שנמצאו עבור המטריקות של הפרודוקטיביות הורדנו את אותם חקלאים.&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="chYQWTdmyedMdJKKDb4r-15" value="&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&amp;nbsp; ערכי קיצון וחוסרים&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;עבור ערכי קיצון שנמצאו עבור המטריקות של הפרודוקטיביות הורדנו את אותם חקלאים.&lt;/div&gt;&lt;div&gt;החלפנו חוסרים עם החציון&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="384.63" y="680" width="400.75" height="154" as="geometry" />
         </mxCell>
         <mxCell id="chYQWTdmyedMdJKKDb4r-16" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="chYQWTdmyedMdJKKDb4r-15">
