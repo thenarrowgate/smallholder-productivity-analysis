@@ -2,8 +2,8 @@ digraph G {
 	overlap=scale splines=true
 	edge [fontsize=12]
 	node [fillcolor="#cae6df" shape=circle style=filled]
-	Motivation [label=Motivation]
 	Anxiety [label=Anxiety]
+	Motivation [label=Motivation]
 	node [shape=box style=""]
 	A1 [label=A1]
 	A2 [label=A2]

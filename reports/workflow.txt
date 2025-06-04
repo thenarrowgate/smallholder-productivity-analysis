@@ -1,0 +1,102 @@
+### Step 1: Initial EDA Seeding
+
+1. Compute Pearson correlation for each $(X,Y)$ in your 747×747 matrix (excluding self-pairs).
+2. If $|r| ≥ 0.2$ and Pearson p < 0.05 (after FDR), add $(X,Y)$ to EDAEds_initial as type “LIN.”
+3. Otherwise, keep $(X,Y)$ for potential nonlinear screening in Step 2.
+
+> *Result*: EDAEds_initial = [(X,Y,"LIN"), …], plus a shortlist of “candidates for NL check” = those with $|r| < 0.2$ or p\_linear>0.05.
+
+---
+
+### Step 2: Flag Nonlinear Among EDA Seeds
+
+1. Let Candidates_NL = EDAEds_initial ∪ any theory‐driven edges.
+2. For each $(X,Y)\in \text{Candidates_NL}$:
+   a. If it’s already “type=LIN,” skip the dCov test (keep as LIN).
+   b. Else (if $|r|<0.2$ or p\_linear>0.05), run dCov/HSIC on $(X,Y)$.
+   c. If dCov p < 0.05 (after FDR on all tested), record $(X,Y)$ as “flagged NL.”
+   d. If dCov p ≥ 0.05 *and* p\_linear ≥ 0.05, *remove* $(X,Y)$ from all seeds.
+
+> *Result*:
+>
+> * EDAEds_lin = [(X,Y,"LIN"), …]
+> * FlaggedNonlinear = [(X,Y,"NL"), …]
+> * Together they form Seeds = EDAEds_lin ∪ FlaggedNonlinear.
+
+---
+
+### Step 3: Lasso-SEM on Seeded Network
+
+1. Construct a semopy model that includes exactly the edges in Seeds.
+2. Apply penalty weights:
+
+   * $w = 10^{-6}$ for every edge in FlaggedNonlinear (so the lasso only drops it if $\partial\ell/\partial\beta=0$).
+   * $w = 1.0$ for edges in EDAEds_lin.
+3. Choose λ by 5-fold CV or BIC over a grid (e.g.\ λ ∈ \[0.1, 0.01, 0.001]).
+4. Fit the lasso-SEM. Extract SurvivingEdges = {(X,Y): \hat\beta_{X→Y}≠0}.
+5. Check fit indices (CFI > 0.90, RMSEA < 0.08, SRMR < 0.08). If fit is poor, consider re‐examining Seeds.
+
+---
+
+### Step 4: Arrow-by-Arrow GAM vs. Linear
+
+For each $(X,Y)\in \text{SurvivingEdges}$:
+
+1. Compute
+
+   $$
+     R_Y \;=\; Y \;-\; \sum_{\substack{Z∈\mathrm{Pa}(Y)\\ Z≠X}} \hat\beta_{Z→Y}·Z.
+   $$
+
+2. *If $X$ is continuous or ordinal‐numeric*:
+
+   * Fit lin: $R_Y ∼ X$, record AICc$_\text{Lin}$.
+   * Fit gam: $R_Y ∼ s(X, n_splines=4)$, record AICc$_\text{GAM}$.
+   * If $\mathrm{AICc}\text{GAM} + 2 <\mathrm{AICc}\text{Lin}$, then label $(X,Y)$ as *NL* and store piecewise slopes. Else label it *LIN* with coefficient $\hat\gamma$.
+
+3. *If $X$ is binary*:
+
+   * Fit lin: $R_Y ∼ X$ (t-test). If p < 0.05 (FDR‐adjusted), label $(X,Y)$ as *LIN*.  Otherwise, drop $(X,Y)$.
+
+4. *If $X$ is nominal/ordinal factor*:
+
+   * Fit ANOVA R_Y ∼ factor(X). If F-test p < 0.05 (FDR‐adjusted), label $(X,Y)$ as *LIN* (with multiple dummy loadings); otherwise drop $(X,Y)$.
+
+> *Result*: a refined set SurvivingEdgesRefined each with a label “LIN” or “NL.”
+
+---
+
+### Step 5: Residual Screening for Omitted Edges
+
+1. For each $Y$, recompute the residual from the Step 4 graph:
+
+   $$
+     R_Y 
+     \;=\; Y -\sum_{Z∈\mathrm{Pa}(Y)} \hat\beta_{Z→Y}\,Z 
+     \quad(\text{where each }Z→Y\text{ is from SurvivingEdgesRefined}).
+   $$
+
+2. For each feature $X'\notin \mathrm{Pa}(Y)$:
+   a. *Cheap linear test*: fit $R_Y ∼ X'$ (Pearson/Spearman/t-test).
+
+   * If p\_linear < 0.05 (after FDR across all $(X',Y)$), immediately add $(X'→Y)$ as a new *LIN* edge (storing the OLS coefficient).
+     b. *Else* (if linear failed): check if $\lvert r\rvert < 0.2$ (or p\_linear > 0.10). If so, run a dCov/HSIC test on $(R_Y,X')$.
+   * If dCov p\_dcov < 0.05 (after FDR on all those tests), add $(X'→Y)$ as *NL* (and will give it a tiny penalty next pass).
+   * Otherwise, do not add $(X'→Y)$.
+
+3. Collect all newly added edges as NewEdges.
+
+---
+
+### Step 6: Iterate (Steps 3–5) Until Convergence
+
+* If NewEdges ≠ ∅:
+
+  1. *Augment* your SEM seed set by adding all $(X'→Y)\in \text{NewEdges}$. Assign penalty $w=10^{-6}$ if it’s NL or $w=1$ if LIN.
+  2. Return to *Step 3* and re‐fit the SEM on the enlarged network.
+  3. Do *Step 4* to refine shapes on the newly surviving edges.
+  4. Do *Step 5* again to catch any further omissions.
+* Stop when NewEdges = ∅. The final set SurvivingEdgesRefined is your completed DAG with each arrow labeled LIN (straight coefficient) or NL (piecewise).
+
+---
+
