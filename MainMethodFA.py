@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pingouin as pg
 from factor_analyzer import FactorAnalyzer
+from collections import defaultdict
 
 from helpers import parse_feature_metadata
 
@@ -19,11 +20,11 @@ if __name__=="__main__":
 
         # drop unnecessary
         # split data by variable type
-        col_type_map = {}
+        col_type_map = defaultdict(list)
 
         for col in df.columns:
             t = parse_feature_metadata(col)["type"]
-            col_type_map[t] = col
+            col_type_map[t].append(col)
 
         # continuous already scaled from EDA, no need to scale here
         df_num = df[col_type_map["continuous"] + col_type_map["ordinal"] + col_type_map["binary"]].copy()
