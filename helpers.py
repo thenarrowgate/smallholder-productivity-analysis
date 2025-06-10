@@ -1,5 +1,6 @@
 import re
 
+POST_EDA_TYPES = ['continuous', 'ordinal', 'binary', 'nominal']
 IDENTIFIER_PATTERN = r'[a-zA-Z][a-zA-Z0-9_]*' 
 TYPE_PATTERN = r'(?:binary|continuous|ordinal|nominal|binary_nominal|binary_ordinal|time)'
 

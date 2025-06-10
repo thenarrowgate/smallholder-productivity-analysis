@@ -21,3 +21,5 @@ shapely
 contextily
 scikit-bio
 gower
+pingouin
+factor_analyzer
