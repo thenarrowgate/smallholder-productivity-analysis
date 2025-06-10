@@ -60,9 +60,10 @@ def initial_screen(df, manual_seeds,
 # -------------------------
 # 2. SEM-LASSO (approximate acyclicity by trace(W^2))
 # -------------------------
-def fit_sem_lasso_torch(X, pairs_df, lambda_grid, tiny_penalty,
+def fit_sem_lasso_torch(X, df, pairs_df, lambda_grid, tiny_penalty,
                         max_iter=500, lr=1e-2,
                         acyc_gamma=10.0, tol=1e-4, patience=50):
+    """Fit SEM Lasso using the provided data matrix and column names."""
     n, p = X.shape
     col_index = {col:i for i,col in enumerate(df.columns)}
 
@@ -533,6 +534,7 @@ def run_until_convergence(df, seeds_df, lambda_grid, tiny_penalty):
         print(f"iteration: {iteration} - fitting sem lasso")
         survivors = fit_sem_lasso_torch(
             torch.from_numpy(df.values).float().to(device),
+            df,
             pairs, lambda_grid, tiny_penalty
         )
         print(f"iteration: {iteration} - refining edges")
