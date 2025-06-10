@@ -11,3 +11,13 @@ networkx
 dash
 plotly
 openpyxl
+osmnx
+DateTime
+folium
+matplotlib
+seaborn
+requests
+shapely
+contextily
+scikit-bio
+gower
