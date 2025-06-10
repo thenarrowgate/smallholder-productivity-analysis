@@ -1,0 +1,13 @@
+numpy
+pandas
+torch
+scikit-learn
+scipy
+dcor
+joblib
+statsmodels
+semopy
+networkx
+dash
+plotly
+openpyxl
