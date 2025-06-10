@@ -14,6 +14,7 @@ if __name__=="__main__":
 
     for df in (nepal_df, senegal_df):
         
+        # TODO: change any code above next todo that might cause issues
         y_prod = df["Q0__AGR_PROD__continuous"]
         y_sus = df["Q0__sustainable_livelihood_score__continuous"]
         df.drop(columns=["Q0__AGR_PROD__continuous", "Q0__sustainable_livelihood_score__continuous"], axis=1, inplace=True)
@@ -38,7 +39,7 @@ if __name__=="__main__":
          [idx[c] for c in col_type_map["continuous"]+col_type_map["binary"]])] = np.corrcoef(
             df_num[col_type_map["continuous"]+col_type_map["binary"]], rowvar=False)
 
-        # polychoric block for ordinals
+        # polychoric block for ordinals TODO: change this and use semopy to calculate polychoric correlation because pingouin does not have this 
         if col_type_map["ordinal"]:
             R_ord = pg.polychoric(df_num[col_type_map["ordinal"]])[0]
             R[np.ix_([idx[c] for c in col_type_map["ordinal"]],
