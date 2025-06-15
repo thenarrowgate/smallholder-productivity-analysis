@@ -1,52 +1,57 @@
 # load requires packages
-library(psych)
-library(EFA.dimensions)
-library(EFAutilities)
-library(mgcv)
-library(lavaan)
-library(semTools)
-library(dplyr)
+library(readxl)    # Excel I/O
+library(dplyr)     # Data wrangling
+library(stringr)   # Regex utilities
+library(EFAtools)  # EFA retention criteria, PARALLEL, VSS
+library(psych)     # fa.parallel, fa(), factor.congruence()
+library(boot)      # bootstrap()
+library(mgcv)      # gam()
+library(lavaan)    # sem(), fitMeasures()
 set.seed(2025)
 
 # load data
 setwd("E:/Atuda/67814-Data-Science-Final-Project/Code")
-df_all   <- readxl::read_excel("nepal_dataframe_FA.xlsx", sheet = 1)
+df <- read_excel("nepal_dataframe_FA.xlsx")
 
-# extract outcome and predictors
-y_prod <- df_all$Q0__AGR_PROD__continuous
-df_all <- df_all %>% select(-Q0__AGR_PROD__continuous, -Q0__sustainable_livelihood_score__continuous)
-
-# Identify numeric vs nominal features via your parse_feature_metadata()
-library(stringr)
-type_from_name <- function(name) {
-  # simple regex to pull TYPE_PATTERN out of column name
-  str_match(name, "__(continuous|ordinal|binary|nominal|time)")[,2]
+process_df <- function(df) {
+  # Extract outcomes
+  y_prod <- df$Q0__AGR_PROD__continuous
+  df      <- df %>% select(-Q0__AGR_PROD__continuous,
+                           -Q0__sustainable_livelihood_score__continuous)
+  # Parse types via regex on column names
+  types <- str_split(names(df), "__", simplify = TRUE)[,3]
+  # Map binary_nominal → nominal
+  types[types=="binary_nominal"] <- "nominal"
+  # Split columns
+  df_cont   <- df[, types=="continuous"]
+  df_ord    <- df[, types=="ordinal"]
+  df_bin    <- df[, types=="binary"]
+  df_nom    <- df[, types=="nominal"]
+  df_num    <- bind_cols(df_cont, df_ord, df_bin)
+  list(df_num = df_num, df_nom = df_nom, y_prod = y_prod)
 }
-col_types <- sapply(names(df_all), type_from_name)
-df_num     <- df_all[, col_types %in% c("continuous","ordinal","binary")]
-df_nominal <- df_all[, which(col_types == "nominal")]
 
-# Compute Spearman R
-R <- cor(df_num, method = "spearman", use = "pairwise.complete.obs")
+nepal  <- process_df(df)
 
-# Parallel analysis (minres factors) with 500 iterations, 95% quantile
-fa.parallel(R,
-            n.obs    = nrow(df_num),
-            fm       = "minres",
-            fa       = "fa",
-            n.iter   = 500,
-            quant    = .95,
-            cor      = "spearman",
-            plot     = FALSE) -> pa_out
+n <- nrow(df)
 
-k_PA <- pa_out$nfact    # suggested upper bound :contentReference[oaicite:6]{index=6}
 
-# MAP on the same R (spearman), providing Ncases
-map_res <- MAP(data    = df_num,
-               corkind = "spearman",
-               Ncases  = nrow(df_num),
-               verbose = FALSE)
+# calculate spearman corr matrix
+R <- cor(nepal$df_num, method="spearman", use="pairwise.complete.obs")
 
-# now extract the suggested number of factors
-k_MAP <- map_res$NfactorsMAP
+# get reliable bracket for k
+pa <- fa.parallel(R, n.obs = n,
+                  fm = "minres", fa = "fa",
+                  n.iter = 500, quant = .95,
+                  plot = FALSE) 
+kPA <- pa$nfact
+
+vss_res <- VSS(R, n = ncol(R), fm = "minres", n.obs = n, plot = FALSE)
+kMAP <- which.min(vss_res$map)
+
+k <- kPA  # or choose within [kMAP,kPA]
+
+R0      <- cor(nepal$df_num, method="spearman")
+efa0    <- fa(R0, nfactors = k, fm = "minres", rotate = "oblimin")
+Lambda0 <- efa0$loadings
 
