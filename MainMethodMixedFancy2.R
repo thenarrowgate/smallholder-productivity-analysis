@@ -13,6 +13,7 @@ library(doSNOW)      # parallel backend
 library(foreach)     # foreach looping
 library(ggplot2)     # plotting
 library(reshape2)    # melt()
+library(WGCNA)   # provides bicor()
 
 # Step 2 ─ Set seed and working directory
 set.seed(2025)
@@ -64,11 +65,23 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 # Step 8 ─ Compute mixed correlation matrix and compare eigenvalues
 het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
 R_mixed <- het_out$correlations
-stopifnot(!any(is.na(R_mixed)))
+
+# overwrite the continuous–continuous block with robust bicor ----------
+cont_idx <- which(types == "continuous")        # positions of numeric vars
+if (length(cont_idx) > 1) {
+  R_cont <- bicor(as.matrix(df_cont),            # robust correlations
+                  use = "pairwise.complete.obs")
+  R_mixed[cont_idx, cont_idx] <- R_cont          # insert into big matrix
+  R_mixed[cont_idx, cont_idx] <- t(R_cont)       # enforce symmetry
+}
+
+stopifnot(!any(is.na(R_mixed)))  # keep your original check
 
 ev_raw <- eigen(hetcor(df_mix2_clean)$correlations)$values
 ev_adj <- eigen(R_mixed)$values
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
+
+
 
 # Step 9 ─ Determine number of factors (parallel analysis & MAP)
 pa_out <- fa.parallel(R_mixed, n.obs=nrow(df_mix2_clean),
