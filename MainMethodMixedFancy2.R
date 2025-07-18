@@ -62,20 +62,54 @@ print(sapply(df_mix2_clean, class))
 cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 
-# Step 8 ─ Compute mixed correlation matrix and compare eigenvalues
+# ── Step 8 ─ Compute mixed correlation matrix ----------------------------------
 het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-R_mixed <- het_out$correlations
+R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
 
-# overwrite the continuous–continuous block with robust bicor ----------
-cont_idx <- which(types == "continuous")        # positions of numeric vars
+# --- REBUILD type vector to align with df_mix2_clean ---------------------------
+# (We can't reuse `types` from Step 4 because columns were dropped.)
+types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
+types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
+
+# --- Identify continuous cols in the CLEANED data ------------------------------
+cont_idx <- which(types_clean == "continuous")
+
+# (Optional) quick report
+cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
+
+# --- Robust bicor for continuous block ----------------------------------------
 if (length(cont_idx) > 1) {
-  R_cont <- bicor(as.matrix(df_cont),            # robust correlations
-                  use = "pairwise.complete.obs")
-  R_mixed[cont_idx, cont_idx] <- R_cont          # insert into big matrix
-  R_mixed[cont_idx, cont_idx] <- t(R_cont)       # enforce symmetry
+  
+  # Extract continuous subset from the *cleaned* data
+  df_cont_clean <- df_mix2_clean[, cont_idx, drop = FALSE]
+  
+  # Optional: flag zero-MAD columns (can distort bicor)
+  mad_vals <- apply(df_cont_clean, 2, mad, na.rm = TRUE)
+  if (any(mad_vals == 0)) {
+    cat("WARNING: zero MAD in continuous vars:\n")
+    print(names(mad_vals)[mad_vals == 0])
+    # bicor() will fallback to Pearson for these vars; acceptable unless many.
+  }
+  
+  # Compute robust correlation
+  R_cont <- WGCNA::bicor(
+    as.matrix(df_cont_clean),
+    use = "pairwise.complete.obs"
+  )
+  
+  # Overwrite the continuous-continuous block in the mixed matrix
+  R_mixed[cont_idx, cont_idx] <- R_cont
+  
+  # Enforce symmetry numerically (defensive; should already be symmetric)
+  R_mixed[cont_idx, cont_idx] <-
+    (R_mixed[cont_idx, cont_idx] + t(R_mixed[cont_idx, cont_idx])) / 2
+  
+  # Force exact 1s on the diagonal (good hygiene before EFA)
+  diag(R_mixed) <- 1
 }
 
-stopifnot(!any(is.na(R_mixed)))  # keep your original check
+stopifnot(!any(is.na(R_mixed)))
+
 
 ev_raw <- eigen(hetcor(df_mix2_clean)$correlations)$values
 ev_adj <- eigen(R_mixed)$values
@@ -92,7 +126,7 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- k_MAP  # choose k
+k     <- 4#k_MAP  # choose k
 
 # Step 10 ─ Bootstrap robust MINRES+oblimin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
@@ -109,7 +143,7 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                          samp <- df_mix2_clean[sample(nrow(df_mix2_clean), replace=TRUE), ]
                          Rb   <- tryCatch(hetcor(samp)$correlations, error=function(e) NULL)
                          if(is.null(Rb) || any(is.na(Rb))) next
-                         fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="oblimin", n.obs=nrow(samp)),
+                         fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
                                           error=function(e) NULL)
                          if(is.null(fa_b)) next
                          return(c(as.vector(fa_b$loadings[]), fa_b$uniquenesses))
@@ -220,9 +254,9 @@ for(i in seq_len(nrow(Lambda0))) {
 
 R_prune <- R_mixed[keep, keep]
 
-# Step 13 ─ Prune survivors with low communality (h²<.25)
+# Step 13 ─ Prune survivors with low communality (h²<.20)
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0]
+drop_comm <- names(h2)[h2<0.20]
 if(length(drop_comm)) message("Dropping low-h² (<.23): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
@@ -268,7 +302,7 @@ res <- foreach(b = 1:B,
                      fa(Rb,
                         nfactors = k,
                         fm       = "minres",
-                        rotate   = "oblimin",
+                        rotate   = "geominQ",
                         n.obs    = nrow(samp)
                      ),
                      error = function(e) NULL
