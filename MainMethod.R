@@ -109,6 +109,11 @@ if (length(cont_idx) > 1) {
 }
 
 stopifnot(!any(is.na(R_mixed)))
+# Step 8b - Suitability checks: KMO and Bartlett tests
+kmo_res <- psych::KMO(R_mixed)
+bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
+cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
+cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
 
 ev_raw <- eigen(hetcor(df_mix2_clean)$correlations)$values
