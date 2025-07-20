@@ -121,8 +121,12 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
 stopifnot(!any(is.na(R_mixed)))
 
 
-ev_raw <- eigen(hetcor(df_mix2_clean)$correlations)$values
-ev_adj <- eigen(R_mixed)$values
+if (COR_METHOD == "mixed") {
+  ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
+} else {
+  df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
+  ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
+}
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
 
@@ -136,7 +140,7 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- 4#k_MAP  # choose k
+k     <- k_MAP  # choose k
 
 # Step 10 ─ Bootstrap robust MINRES+oblimin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
@@ -151,7 +155,14 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                      .options.snow=opts) %dopar% {
                        repeat {
                          samp <- df_mix2_clean[sample(nrow(df_mix2_clean), replace=TRUE), ]
-                         Rb   <- tryCatch(hetcor(samp)$correlations, error=function(e) NULL)
+                         Rb   <- tryCatch({
+                           if (COR_METHOD == "mixed") {
+                             hetcor(samp, use = "pairwise.complete.obs")$correlations
+                           } else {
+                             samp_num <- as.data.frame(lapply(samp, as.numeric))
+                             cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
+                           }
+                         }, error=function(e) NULL)
                          if(is.null(Rb) || any(is.na(Rb))) next
                          fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
                                           error=function(e) NULL)
@@ -292,9 +303,16 @@ res <- foreach(b = 1:B,
                    samp_idx <- sample(nrow(df_mix2_clean), replace = TRUE)
                    samp     <- df_mix2_clean[samp_idx, keep_final, drop = FALSE]
                    
-                   # b) mixed correlation
+                   # b) correlation
                    Rb <- tryCatch(
-                     hetcor(samp, use = "pairwise.complete.obs")$correlations,
+                     {
+                       if (COR_METHOD == "mixed") {
+                         hetcor(samp, use = "pairwise.complete.obs")$correlations
+                       } else {
+                         samp_num <- as.data.frame(lapply(samp, as.numeric))
+                         cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
+                       }
+                     },
                      error = function(e) NULL
                    )
                    if (is.null(Rb) || any(is.na(Rb))) next
