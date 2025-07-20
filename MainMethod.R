@@ -140,9 +140,9 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- k_MAP  # choose k
+k     <- 3#k_MAP  # choose k
 
-# Step 10 ─ Bootstrap robust MINRES+oblimin to get loadings & uniquenesses
+# Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
 B <- 1000
 n_cores <- parallel::detectCores() - 1
@@ -269,8 +269,8 @@ R_prune <- R_mixed[keep, keep]
 
 # Step 13 ─ Prune survivors with low communality (h²<.20)
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.20]
-if(length(drop_comm)) message("Dropping low-h² (<.23): ", paste(drop_comm, collapse=", "))
+drop_comm <- names(h2)[h2<0]
+if(length(drop_comm)) message("Dropping low-h² (<.2): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
 Psi0       <- Psi0[keep_final]
