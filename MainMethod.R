@@ -53,8 +53,34 @@ df_nom  <- df[, types == "nominal",    drop = FALSE]
 df_ord_factored <- df_ord %>% mutate(across(everything(), ordered))
 df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 
+# Step 5b ─ Convert nominal variables ---------------------------------------
+# Nominal variables are encoded to numeric or ordered form so they can be used
+# in the correlation matrix. The heuristic used is:
+#   * two levels  -> binary 0/1
+#   * 3--5 levels -> ordered factor (1..n)
+#   * >5 levels   -> numeric scores from princals() (nonlinear PCA)
+
+convert_nominal <- function(x) {
+  lvls <- unique(x)
+  lvls <- lvls[!is.na(lvls)]
+  n <- length(lvls)
+  if (n <= 2) {
+    return(as.integer(factor(x, levels = lvls)) - 1L)
+  } else if (n <= 5) {
+    return(ordered(x, levels = lvls))
+  } else {
+    suppressMessages({
+      pc <- princals(data.frame(v=factor(x)), ndim = 1)
+      return(as.numeric(pc$objects$scores[,1]))
+    })
+  }
+}
+
+df_nom_processed <- df_nom %>% mutate(across(everything(), convert_nominal))
+
 # Step 6 ─ Rebuild mixed‐type dataset and drop NAs
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)
+df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored,
+                           df_nom_processed)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
 # Step 7 ─ Debug: drop unsupported column classes
