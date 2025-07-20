@@ -127,6 +127,7 @@ if (COR_METHOD == "mixed") {
   df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
   ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
 }
+ev_adj <- eigen(R_mixed)$values
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
 
