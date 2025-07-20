@@ -265,6 +265,20 @@ for(i in seq_len(nrow(Lambda0))) {
   if(abs(row[sec])<.15) Lambda0[i,sec] <- 0
 }
 
+#   12.5 Drop items with strong cross-loadings
+drop_xload <- c()
+for(i in seq_len(nrow(Lambda0))) {
+  sorted <- sort(abs(Lambda0[i, ]), decreasing = TRUE)
+  if(sorted[2] >= 0.30 && (sorted[1] - sorted[2]) <= 0.10)
+    drop_xload <- c(drop_xload, rownames(Lambda0)[i])
+}
+if(length(drop_xload)) {
+  message("Dropping near cross-loaders: ", paste(drop_xload, collapse=", "))
+  keep    <- setdiff(keep, drop_xload)
+  Lambda0 <- Lambda0[setdiff(rownames(Lambda0), drop_xload), , drop=FALSE]
+  Psi0    <- Psi0[setdiff(names(Psi0), drop_xload)]
+}
+
 R_prune <- R_mixed[keep, keep]
 
 # Step 13 ─ Prune survivors with low communality (h²<.20)
