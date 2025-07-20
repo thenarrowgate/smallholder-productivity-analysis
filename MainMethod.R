@@ -14,6 +14,7 @@ library(foreach)     # foreach looping
 library(ggplot2)     # plotting
 library(reshape2)    # melt()
 library(WGCNA)   # provides bicor()
+library(Matrix)   # nearPD for KMO/Bartlett
 
 # Step 2 ─ Set seed and working directory
 set.seed(2025)
@@ -106,6 +107,9 @@ if (length(cont_idx) > 1) {
   
   # Force exact 1s on the diagonal (good hygiene before EFA)
   diag(R_mixed) <- 1
+  
+  # Ensure positive-definite matrix for suitability tests
+  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 }
 
 stopifnot(!any(is.na(R_mixed)))
