@@ -117,10 +117,10 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   
   # Force exact 1s on the diagonal (good hygiene before EFA)
   diag(R_mixed) <- 1
-  
-  # Ensure positive-definite matrix for suitability tests
-  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 }
+
+# Ensure positive-definite matrix for suitability tests
+R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 
 stopifnot(!any(is.na(R_mixed)))
 # Step 8b - Suitability checks: KMO and Bartlett tests
