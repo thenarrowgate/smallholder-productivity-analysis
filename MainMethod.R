@@ -62,9 +62,19 @@ print(sapply(df_mix2_clean, class))
 cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 
-# ── Step 8 ─ Compute mixed correlation matrix ----------------------------------
-het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+# ── Step 8 ─ Compute correlation matrix ---------------------------------------
+# Choose between "mixed" (default) or "spearman" correlations
+COR_METHOD <- "mixed"
+
+if (COR_METHOD == "mixed") {
+  het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
+  R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+} else if (COR_METHOD == "spearman") {
+  df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
+  R_mixed <- cor(df_numeric, method = "spearman", use = "pairwise.complete.obs")
+} else {
+  stop("Unknown COR_METHOD")
+}
 
 # --- REBUILD type vector to align with df_mix2_clean ---------------------------
 # (We can't reuse `types` from Step 4 because columns were dropped.)
@@ -78,7 +88,7 @@ cont_idx <- which(types_clean == "continuous")
 cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
 
 # --- Robust bicor for continuous block ----------------------------------------
-if (length(cont_idx) > 1) {
+if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   
   # Extract continuous subset from the *cleaned* data
   df_cont_clean <- df_mix2_clean[, cont_idx, drop = FALSE]
