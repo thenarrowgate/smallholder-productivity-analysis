@@ -133,14 +133,14 @@ plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
 # Step 9 ─ Determine number of factors (parallel analysis & MAP)
 pa_out <- fa.parallel(R_mixed, n.obs=nrow(df_mix2_clean),
-                      fm="minres", fa="fa",
+                      fm="ml", fa="fa",
                       n.iter=500, quant=.95,
                       cor="cor", use="pairwise", plot=FALSE)
 k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
-               fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
+               fm="ml", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- 3#k_MAP  # choose k
+k     <- k_MAP  # choose k
 
 # Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
@@ -164,7 +164,7 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                            }
                          }, error=function(e) NULL)
                          if(is.null(Rb) || any(is.na(Rb))) next
-                         fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
+                         fa_b <- tryCatch(fa(Rb, nfactors=k, fm="ml", rotate="oblimin", n.obs=nrow(samp)),
                                           error=function(e) NULL)
                          if(is.null(fa_b)) next
                          return(c(as.vector(fa_b$loadings[]), fa_b$uniquenesses))
@@ -321,8 +321,8 @@ res <- foreach(b = 1:B,
                    fa_b <- tryCatch(
                      fa(Rb,
                         nfactors = k,
-                        fm       = "minres",
-                        rotate   = "geominQ",
+                        fm       = "ml",
+                        rotate   = "oblimin",
                         n.obs    = nrow(samp)
                      ),
                      error = function(e) NULL
