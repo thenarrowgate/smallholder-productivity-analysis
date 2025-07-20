@@ -181,14 +181,6 @@ df_psi_ci <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# build df_psi_ci for the uniqueness‐CI
-psi_ci   <- apply(psi_boot, 2, quantile, c(.025, .975))
-df_psi_ci <- data.frame(
-  variable = vars,
-  lower    = psi_ci[1, ],
-  upper    = psi_ci[2, ],
-  stringsAsFactors = FALSE
-)
 
 # Write medians and CIs to CSV
 write.csv(L_median,        "L_median_sngl.csv",   row.names = TRUE)
