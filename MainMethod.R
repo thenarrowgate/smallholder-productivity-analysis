@@ -18,7 +18,21 @@ library(Matrix)   # nearPD for KMO/Bartlett
 
 # Step 2 ─ Set seed and working directory
 set.seed(2025)
-LOCAL_DIR <- "E:/Atuda/67814-Data-Science-Final-Project/Code"
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) > 0) {
+  LOCAL_DIR <- args[1]
+} else {
+  full_args <- commandArgs(trailingOnly = FALSE)
+  file_idx <- grep("^--file=", full_args)
+  if (length(file_idx) > 0) {
+    script_path <- sub("^--file=", "", full_args[file_idx[1]])
+    LOCAL_DIR <- dirname(normalizePath(script_path))
+  } else if (requireNamespace("here", quietly = TRUE)) {
+    LOCAL_DIR <- here::here()
+  } else {
+    LOCAL_DIR <- "."
+  }
+}
 setwd(LOCAL_DIR)
 
 # Step 3 ─ Read in data and drop outcome columns
