@@ -14,6 +14,7 @@ library(foreach)     # foreach looping
 library(ggplot2)     # plotting
 library(reshape2)    # melt()
 library(WGCNA)   # provides bicor()
+library(Matrix)   # nearPD for KMO/Bartlett
 
 # Step 2 ─ Set seed and working directory
 set.seed(2025)
@@ -116,9 +117,17 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   
   # Force exact 1s on the diagonal (good hygiene before EFA)
   diag(R_mixed) <- 1
+  
+  # Ensure positive-definite matrix for suitability tests
+  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 }
 
 stopifnot(!any(is.na(R_mixed)))
+# Step 8b - Suitability checks: KMO and Bartlett tests
+kmo_res <- psych::KMO(R_mixed)
+bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
+cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
+cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
 
 if (COR_METHOD == "mixed") {
