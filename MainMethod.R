@@ -14,7 +14,7 @@ library(foreach)     # foreach looping
 library(ggplot2)     # plotting
 library(reshape2)    # melt()
 library(WGCNA)   # provides bicor()
-# 'here' package is optional; used for portable paths if available
+library(Matrix)   # nearPD for KMO/Bartlett
 
 # Step 2 ─ Set seed and working directory
 set.seed(2025)
@@ -77,9 +77,19 @@ print(sapply(df_mix2_clean, class))
 cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 
-# ── Step 8 ─ Compute mixed correlation matrix ----------------------------------
-het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+# ── Step 8 ─ Compute correlation matrix ---------------------------------------
+# Choose between "mixed" (default) or "spearman" correlations
+COR_METHOD <- "spearman"
+
+if (COR_METHOD == "mixed") {
+  het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
+  R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+} else if (COR_METHOD == "spearman") {
+  df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
+  R_mixed <- cor(df_numeric, method = "spearman", use = "pairwise.complete.obs")
+} else {
+  stop("Unknown COR_METHOD")
+}
 
 # --- REBUILD type vector to align with df_mix2_clean ---------------------------
 # (We can't reuse `types` from Step 4 because columns were dropped.)
@@ -93,7 +103,7 @@ cont_idx <- which(types_clean == "continuous")
 cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
 
 # --- Robust bicor for continuous block ----------------------------------------
-if (length(cont_idx) > 1) {
+if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   
   # Extract continuous subset from the *cleaned* data
   df_cont_clean <- df_mix2_clean[, cont_idx, drop = FALSE]
@@ -121,13 +131,25 @@ if (length(cont_idx) > 1) {
   
   # Force exact 1s on the diagonal (good hygiene before EFA)
   diag(R_mixed) <- 1
+  
+  # Ensure positive-definite matrix for suitability tests
+  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 }
 
 stopifnot(!any(is.na(R_mixed)))
+# Step 8b - Suitability checks: KMO and Bartlett tests
+kmo_res <- psych::KMO(R_mixed)
+bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
+cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
+cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
 
-ev_raw <- eigen(hetcor(df_mix2_clean)$correlations)$values
-ev_adj <- eigen(R_mixed)$values
+if (COR_METHOD == "mixed") {
+  ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
+} else {
+  df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
+  ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
+}
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
 
@@ -141,9 +163,9 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- 4#k_MAP  # choose k
+k     <- 3#k_MAP  # choose k
 
-# Step 10 ─ Bootstrap robust MINRES+oblimin to get loadings & uniquenesses
+# Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
 B <- 1000
 n_cores <- parallel::detectCores() - 1
@@ -156,7 +178,14 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                      .options.snow=opts) %dopar% {
                        repeat {
                          samp <- df_mix2_clean[sample(nrow(df_mix2_clean), replace=TRUE), ]
-                         Rb   <- tryCatch(hetcor(samp)$correlations, error=function(e) NULL)
+                         Rb   <- tryCatch({
+                           if (COR_METHOD == "mixed") {
+                             hetcor(samp, use = "pairwise.complete.obs")$correlations
+                           } else {
+                             samp_num <- as.data.frame(lapply(samp, as.numeric))
+                             cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
+                           }
+                         }, error=function(e) NULL)
                          if(is.null(Rb) || any(is.na(Rb))) next
                          fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
                                           error=function(e) NULL)
@@ -196,14 +225,6 @@ df_psi_ci <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# build df_psi_ci for the uniqueness‐CI
-psi_ci   <- apply(psi_boot, 2, quantile, c(.025, .975))
-df_psi_ci <- data.frame(
-  variable = vars,
-  lower    = psi_ci[1, ],
-  upper    = psi_ci[2, ],
-  stringsAsFactors = FALSE
-)
 
 # Write medians and CIs to CSV
 write.csv(L_median,        "L_median_sngl.csv",   row.names = TRUE)
@@ -271,8 +292,8 @@ R_prune <- R_mixed[keep, keep]
 
 # Step 13 ─ Prune survivors with low communality (h²<.20)
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.20]
-if(length(drop_comm)) message("Dropping low-h² (<.23): ", paste(drop_comm, collapse=", "))
+drop_comm <- names(h2)[h2<0]
+if(length(drop_comm)) message("Dropping low-h² (<.2): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
 Psi0       <- Psi0[keep_final]
@@ -305,9 +326,16 @@ res <- foreach(b = 1:B,
                    samp_idx <- sample(nrow(df_mix2_clean), replace = TRUE)
                    samp     <- df_mix2_clean[samp_idx, keep_final, drop = FALSE]
                    
-                   # b) mixed correlation
+                   # b) correlation
                    Rb <- tryCatch(
-                     hetcor(samp, use = "pairwise.complete.obs")$correlations,
+                     {
+                       if (COR_METHOD == "mixed") {
+                         hetcor(samp, use = "pairwise.complete.obs")$correlations
+                       } else {
+                         samp_num <- as.data.frame(lapply(samp, as.numeric))
+                         cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
+                       }
+                     },
                      error = function(e) NULL
                    )
                    if (is.null(Rb) || any(is.na(Rb))) next
