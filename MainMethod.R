@@ -204,7 +204,7 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- k_MAP  # choose k
+k     <- 2#k_MAP  # choose k
 
 # Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
