@@ -143,6 +143,20 @@ bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
 cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
 cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
+# -- Per-variable MSA assessment ----------------------------------------------
+msa_vec <- kmo_res$MSAi
+names(msa_vec) <- colnames(R_mixed)
+low_msa <- msa_vec[msa_vec < 0.5]
+if (length(low_msa) > 0) {
+  cat("Variables dropped for low MSA (<0.5):\n")
+  print(round(low_msa, 3))
+  keep_vars <- setdiff(colnames(R_mixed), names(low_msa))
+  R_mixed <- R_mixed[keep_vars, keep_vars]
+  df_mix2_clean <- df_mix2_clean[, keep_vars, drop = FALSE]
+} else {
+  cat("No variables dropped for low MSA\n")
+}
+
 
 if (COR_METHOD == "mixed") {
   ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
