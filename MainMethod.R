@@ -60,27 +60,27 @@ df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 #   * 3--5 levels -> ordered factor (1..n)
 #   * >5 levels   -> numeric scores from princals() (nonlinear PCA)
 
-convert_nominal <- function(x) {
-  lvls <- unique(x)
-  lvls <- lvls[!is.na(lvls)]
-  n <- length(lvls)
-  if (n <= 2) {
-    return(as.integer(factor(x, levels = lvls)) - 1L)
-  } else if (n <= 5) {
-    return(ordered(x, levels = lvls))
-  } else {
-    suppressMessages({
-      pc <- princals(data.frame(v=factor(x)), ndim = 1)
-      return(as.numeric(pc$objects$scores[,1]))
-    })
-  }
-}
-
-df_nom_processed <- df_nom %>% mutate(across(everything(), convert_nominal))
+# convert_nominal <- function(x) {
+#   lvls <- unique(x)
+#   lvls <- lvls[!is.na(lvls)]
+#   n <- length(lvls)
+#   if (n <= 2) {
+#     return(as.integer(factor(x, levels = lvls)) - 1L)
+#   } else if (n <= 5) {
+#     return(ordered(x, levels = lvls))
+#   } else {
+#     suppressMessages({
+#       pc <- princals(data.frame(v=factor(x)), ndim = 1)
+#       return(as.numeric(pc$objects$scores[,1]))
+#     })
+#   }
+# }
+# 
+# df_nom_processed <- df_nom %>% mutate(across(everything(), convert_nominal))
 
 # Step 6 ─ Rebuild mixed‐type dataset and drop NAs
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored,
-                           df_nom_processed)
+df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)#,
+                           #df_nom_processed)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
 # Step 7 ─ Debug: drop unsupported column classes
@@ -105,7 +105,7 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
 # Choose between "mixed" (default) or "spearman" correlations
-COR_METHOD <- "mixed"
+COR_METHOD <- "spearman"
 
 if (COR_METHOD == "mixed") {
   het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
