@@ -456,5 +456,156 @@ cat(sprintf("Finished %d valid bootstraps\n", nrow(phis_rob)))
 cat("Robust mean Tucker's φ: ", phi_mean, "\n")
 cat("Robust mean Hancock's H:",  H_mean,   "\n")
 
+# ---------------------------------------------------------------------------
+# 15. Communalities & Residual Diagnostics
+# ---------------------------------------------------------------------------
+# Compute item communalities from the pruned loading matrix.  These give a
+# quick check of how well each retained variable is represented by the
+# extracted factors.
+h2 <- rowSums(Lambda0^2)
+cat("Mean communality (h²):", mean(h2), "\n")
+print(head(data.frame(variable = names(h2), communality = h2), 10))
+
+# Build the uniqueness matrix Ψ from the vector of uniquenesses.  Having a
+# proper diagonal matrix makes later residual calculations clearer.
+Psi_mat <- diag(Psi0)
+rownames(Psi_mat) <- names(Psi0)
+colnames(Psi_mat) <- names(Psi0)
+
+# Residual correlation matrix: R_resid = R_prune − ΛΛᵀ − Ψ
+resid_mat <- R_prune - (Lambda0 %*% t(Lambda0)) - Psi_mat
+
+# Overall misfit measured by the root-mean-square residual (RMSR) on the
+# off-diagonal elements only.
+off_diag_vals <- resid_mat[lower.tri(resid_mat)]
+RMSR <- sqrt(mean(off_diag_vals^2))
+cat("RMSR =", round(RMSR, 4), "\n")
+
+# Identify any residuals with absolute value greater than 0.10, which can
+# highlight local areas of poor fit.
+off_idx <- which(abs(resid_mat) > 0.10, arr.ind = TRUE)
+if (nrow(off_idx) > 0) {
+  offenders <- data.frame(
+    var1     = rownames(resid_mat)[off_idx[,1]],
+    var2     = colnames(resid_mat)[off_idx[,2]],
+    residual = resid_mat[off_idx]
+  )
+  cat("Residuals exceeding |.10|:\n")
+  print(offenders)
+} else {
+  cat("No residuals exceed |0.10|.\n")
+}
+
+# Visualise the residual matrix with a heatmap for an at-a-glance view of
+# where correlations are over- or under-estimated by the factor model.
+df_long <- reshape2::melt(resid_mat, varnames = c("Row", "Col"),
+                          value.name = "Residual")
+ggplot(df_long, aes(x = Col, y = Row, fill = Residual)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low      = "blue",
+    mid      = "white",
+    high     = "red",
+    midpoint = 0
+  ) +
+  geom_text(aes(label = round(Residual, 2)), size = 2.5) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8),
+    panel.grid  = element_blank()
+  ) +
+  labs(fill = "Residual")
+
+# ---------------------------------------------------------------------------
+# 16. Restrict all summaries & plots to the pruned items
+# ---------------------------------------------------------------------------
+df_L_ci_pruned <- df_L_ci %>%
+  filter(variable %in% keep_final)
+
+L_median_pruned <- Lambda0
+colnames(L_median_pruned) <- colnames(Lambda0)
+rownames(L_median_pruned) <- keep_final
+
+# ---------------------------------------------------------------------------
+# 17. Summaries on pruned loadings
+# ---------------------------------------------------------------------------
+# Variables whose confidence interval spans zero are considered unstable.
+unstable_pruned <- df_L_ci_pruned %>%
+  filter(lower <= 0 & upper >= 0)
+cat("=== Pruned unstable loadings (CI spans 0) ===\n")
+print(unstable_pruned)
+
+# Identify cross-loading candidates: variables with non-zero CIs on more than
+# one factor.
+cross_pruned <- df_L_ci_pruned %>%
+  mutate(nonzero = (lower > 0 | upper < 0)) %>%
+  filter(nonzero) %>%
+  group_by(variable) %>%
+  summarise(
+    n_factors = n(),
+    intervals = paste0(factor, "[", round(lower, 2), ",", round(upper, 2), "]",
+                       collapse = "; ")
+  ) %>%
+  filter(n_factors > 1)
+cat("\n=== Pruned cross-loading candidates ===\n")
+print(cross_pruned)
+
+# Candidate labels: loadings whose entire CI lies beyond ±0.30.
+label_pruned <- df_L_ci_pruned %>%
+  filter(lower >= 0.30 | upper <= -0.30) %>%
+  arrange(factor, desc(abs((lower + upper) / 2)))
+cat("\n=== Pruned labeling candidates (CI beyond ±0.30) ===\n")
+print(label_pruned)
+
+# ---------------------------------------------------------------------------
+# 18. CI-errorbar plot for pruned loadings
+# ---------------------------------------------------------------------------
+ggplot(df_L_ci_pruned,
+       aes(x = reorder(variable, (lower + upper) / 2),
+           y = (lower + upper) / 2, ymin = lower, ymax = upper,
+           colour = factor)) +
+  geom_errorbar(position = position_dodge(width = 0.6), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.6), size = 2) +
+  coord_flip() +
+  labs(
+    x     = NULL,
+    y     = "Median loading ±95% CI",
+    title = "Pruned: Bootstrapped 95% CIs for Factor Loadings"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# ---------------------------------------------------------------------------
+# 19. Heatmap of pruned median loadings
+# ---------------------------------------------------------------------------
+L_df_pruned <- as.data.frame(L_median_pruned)
+L_df_pruned$variable <- rownames(L_df_pruned)
+
+L_long_pruned <- L_df_pruned %>%
+  pivot_longer(-variable, names_to = "factor", values_to = "loading")
+
+ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low      = "blue",
+    mid      = "white",
+    high     = "red",
+    midpoint = 0,
+    name     = "Loading"
+  ) +
+  labs(
+    title = "Pruned: Median Factor Loadings Heatmap",
+    x     = NULL,
+    y     = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x    = element_text(angle = 45, hjust = 1),
+    axis.text.y    = element_text(size = 8),
+    legend.position = "right"
+  )
+
+
 
 
