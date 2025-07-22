@@ -659,11 +659,11 @@ par(mfrow = c(1, 1))
 plot(gam_fit, residuals = TRUE)
 
 # 4. Multiple-testing control on parametric terms (FDR)
-param_table <- summary(gam_fit)$p.table
-if (nrow(param_table) > 1) {
-  p_adj <- p.adjust(param_table[-1, 4], method = "fdr")  # skip intercept
+param_terms <- summary(gam_fit)$pTerms.table
+if (!is.null(param_terms) && nrow(param_terms) > 0) {
+  p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
   print(p_adj)
-  signif_terms <- rownames(param_table)[-1][p_adj < 0.05]
+  signif_terms <- rownames(param_terms)[p_adj < 0.05]
 } else {
   p_adj <- numeric(0)
   signif_terms <- character(0)
@@ -671,7 +671,11 @@ if (nrow(param_table) > 1) {
 
 # 5. Refit using only significant parametric terms and compare AIC
 refit_terms <- c(smooth_terms, signif_terms, large_terms)
-refit_form <- as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+if (length(refit_terms) == 0) {
+  refit_form <- as.formula("prod_index ~ 1")
+} else {
+  refit_form <- as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+}
 gam_refit <- mgcv::gam(refit_form, data = gam_df, method = "REML", select = TRUE)
 cat("AIC(original)=", AIC(gam_fit), " AIC(refit)=", AIC(gam_refit), "\n")
 
