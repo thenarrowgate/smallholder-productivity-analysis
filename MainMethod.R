@@ -100,7 +100,7 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
 # Choose between "mixed" (default) or "spearman" correlations
-COR_METHOD <- "spearman"
+COR_METHOD <- "mixed"
 
 if (COR_METHOD == "mixed") {
   het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
