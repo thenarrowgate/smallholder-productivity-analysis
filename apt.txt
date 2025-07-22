@@ -13,5 +13,6 @@ r-cran-doparallel
 r-cran-foreach
 r-cran-ggplot2
 r-cran-reshape2
+r-cran-tidyr
 r-cran-wgcna
 r-cran-matrix

@@ -16,11 +16,12 @@ Before EFA, the script now checks variable suitability using the KMO and Bartlet
    ```bash
    conda env create -f environment.yml
    ```
-2. **R packages** – most libraries are installed via `apt.txt` during setup.
-   Remaining packages (EFAtools and Gifi) can be installed with:
+2. **R setup** – install system and R dependencies
    ```bash
-   ./.setup/install_r_packages.sh
+   ./.setup/setup.sh
    ```
+   This script reads `apt.txt` (which includes `r-base`) and installs
+   the EFAtools and Gifi packages.
 
 ## Running the Analysis
 - **Run preprocessing**
@@ -29,6 +30,7 @@ Before EFA, the script now checks variable suitability using the KMO and Bartlet
   ```
   The notebook will save cleaned datasets used by the R script.
 - **Run factor analysis**
+  Ensure `.setup/setup.sh` has been executed to install dependencies.
   Update `LOCAL_DIR` in `MainMethod.R` to the repository path and then execute:
   ```bash
   Rscript MainMethod.R
