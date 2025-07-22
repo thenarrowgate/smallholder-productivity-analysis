@@ -53,34 +53,9 @@ df_nom  <- df[, types == "nominal",    drop = FALSE]
 df_ord_factored <- df_ord %>% mutate(across(everything(), ordered))
 df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 
-# Step 5b ─ Convert nominal variables ---------------------------------------
-# Nominal variables are encoded to numeric or ordered form so they can be used
-# in the correlation matrix. The heuristic used is:
-#   * two levels  -> binary 0/1
-#   * 3--5 levels -> ordered factor (1..n)
-#   * >5 levels   -> numeric scores from princals() (nonlinear PCA)
-
-convert_nominal <- function(x) {
-  lvls <- unique(x)
-  lvls <- lvls[!is.na(lvls)]
-  n <- length(lvls)
-  if (n <= 2) {
-    return(as.integer(factor(x, levels = lvls)) - 1L)
-  } else if (n <= 5) {
-    return(ordered(x, levels = lvls))
-  } else {
-    suppressMessages({
-      pc <- princals(data.frame(v=factor(x)), ndim = 1)
-      return(as.numeric(pc$objects$scores[,1]))
-    })
-  }
-}
-
-df_nom_processed <- df_nom %>% mutate(across(everything(), convert_nominal))
-
 # Step 6 ─ Rebuild mixed‐type dataset and drop NAs
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored,
-                           df_nom_processed)
+df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)#,
+                           #df_nom_processed)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
 # Step 7 ─ Debug: drop unsupported column classes
@@ -105,7 +80,7 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
 # Choose between "mixed" (default) or "spearman" correlations
-COR_METHOD <- "mixed"
+COR_METHOD <- "spearman"
 
 if (COR_METHOD == "mixed") {
   het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
@@ -204,7 +179,7 @@ k_PA  <- pa_out$nfact
 vss_out <- VSS(R_mixed, n=ncol(R_mixed),
                fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- k_MAP  # choose k
+k     <- 2#k_MAP  # choose k
 
 # Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 p <- ncol(df_mix2_clean)
@@ -331,10 +306,10 @@ for(i in seq_len(nrow(Lambda0))) {
 
 R_prune <- R_mixed[keep, keep]
 
-# Step 13 ─ Prune survivors with low communality (h²<.20)
+# Step 13 ─ Prune survivors with low communality (h²<.25)
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.2]
-if(length(drop_comm)) message("Dropping low-h² (<.2): ", paste(drop_comm, collapse=", "))
+drop_comm <- names(h2)[h2<0.25]
+if(length(drop_comm)) message("Dropping low-h² (<.25): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
 Psi0       <- Psi0[keep_final]
