@@ -1,2 +1,16 @@
-# apt.txt
+# System-level dependencies for analysis
 r-base
+r-cran-dplyr
+r-cran-boot
+r-cran-lavaan
+r-cran-mgcv
+r-cran-polycor
+r-cran-psych
+r-cran-readxl
+r-cran-stringr
+r-cran-dosnow
+r-cran-foreach
+r-cran-ggplot2
+r-cran-reshape2
+r-cran-wgcna
+r-cran-matrix

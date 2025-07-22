@@ -16,7 +16,12 @@ Before EFA, the script now checks variable suitability using the KMO and Bartlet
    ```bash
    conda env create -f environment.yml
    ```
-2. **R packages** – install the packages listed at the top of `MainMethod.R` (dplyr, EFAtools, lavaan, etc.).
+2. **R packages**
+   - System packages listed in `apt.txt` will be installed automatically in the Codex environment.
+   - After the container is built, run the helper script to install CRAN packages that are not available via apt:
+     ```bash
+     Rscript scripts/install_missing_R_packages.R
+     ```
 
 ## Running the Analysis
 - **Run preprocessing**
