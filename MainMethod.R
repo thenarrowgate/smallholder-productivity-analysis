@@ -331,10 +331,10 @@ for(i in seq_len(nrow(Lambda0))) {
 
 R_prune <- R_mixed[keep, keep]
 
-# Step 13 ─ Prune survivors with low communality (h²<.20)
+# Step 13 ─ Prune survivors with low communality (h²<.25)
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.2]
-if(length(drop_comm)) message("Dropping low-h² (<.2): ", paste(drop_comm, collapse=", "))
+drop_comm <- names(h2)[h2<0.0]
+if(length(drop_comm)) message("Dropping low-h² (<.25): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
 Psi0       <- Psi0[keep_final]
