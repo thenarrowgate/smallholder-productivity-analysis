@@ -607,6 +607,66 @@ ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
     legend.position = "right"
   )
 
+# ---------------------------------------------------------------------------
+# 20. Factor scores and GAM regression
+# ---------------------------------------------------------------------------
+# After pruning we compute Ten Berge factor scores for the retained variables
+# and examine their relationship with the productivity index using a
+# generalised additive model.  Nominal predictors are collapsed to an "Other"
+# level if a category represents fewer than 5% of observations.
+
+# --- 20.1  Compute Ten Berge scores for the final items ---------------------
+raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
+raw_data_num <- data.frame(lapply(raw_data, function(col) {
+  if (is.numeric(col)) {
+    col
+  } else if (is.factor(col) || is.ordered(col)) {
+    as.numeric(col)
+  } else {
+    stop("Unsupported column class: ", class(col))
+  }
+}))
+
+X_std <- scale(raw_data_num)
+Rzz   <- R_prune
+Rinv  <- solve(Rzz)
+Tmat  <- t(Lambda0) %*% Rinv %*% Lambda0
+Wten  <- (Rinv %*% Lambda0) %*% solve(Tmat)
+F_hat <- X_std %*% Wten
+colnames(F_hat) <- colnames(Lambda0)
+rownames(F_hat) <- rownames(df_mix2_clean)
+
+# --- 20.2  Prepare nominal predictors --------------------------------------
+collapse_rare <- function(f, threshold = 0.05) {
+  tab <- prop.table(table(f))
+  rare <- names(tab)[tab < threshold]
+  f_new <- as.character(f)
+  f_new[f_new %in% rare] <- "Other"
+  factor(f_new)
+}
+
+nom_collapsed <- df_nom %>% mutate(across(everything(), collapse_rare))
+is_large <- function(v) nlevels(v) > 10
+large_noms <- names(Filter(is_large, nom_collapsed))
+small_noms <- names(Filter(Negate(is_large), nom_collapsed))
+
+# --- 20.3  Fit GAM of productivity on factor scores ------------------------
+gam_df <- data.frame(prod_index = y_prod, F_hat, nom_collapsed)
+gam_df <- na.omit(gam_df)
+
+smooth_terms <- paste0("s(", colnames(F_hat), ")")
+small_terms  <- if (length(small_noms)) paste(small_noms, collapse = " + ") else NULL
+large_terms  <- if (length(large_noms)) paste0("s(", large_noms, ", bs='re')", collapse = " + ") else NULL
+all_terms <- c(smooth_terms, small_terms, large_terms)
+gam_form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
+
+gam_fit <- mgcv::gam(gam_form, data = gam_df, method = "REML", select = TRUE)
+print(summary(gam_fit)$s.table)
+print(summary(gam_fit)$p.table)
+
+par(mfrow = c(1, ncol(F_hat)))
+plot(gam_fit, pages = 1, all.terms = TRUE, shade = TRUE)
+
 
 
 
