@@ -87,7 +87,10 @@ if (COR_METHOD == "mixed") {
   # levels. The `psych` package offers `mixedCor`, which estimates pairwise
   # polychoric/polyserial correlations and tends to give a more factorable
   # matrix. This helps prevent artificially low KMO values.
-  mc_out  <- psych::mixedCor(df_mix2_clean, correct=0, global=FALSE)
+  df_cor_ready <- df_mix2_clean %>%
+    mutate(across(where(is.character), as.factor),
+           across(where(is.logical),   as.numeric))
+  mc_out  <- psych::mixedCor(df_cor_ready, correct = 0, global = FALSE)
   R_mixed <- mc_out$rho
 } else if (COR_METHOD == "spearman") {
   df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
