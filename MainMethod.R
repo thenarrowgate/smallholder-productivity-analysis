@@ -23,6 +23,7 @@ library(doSNOW)      # parallel backend
 library(foreach)     # foreach looping
 library(ggplot2)     # plotting
 library(reshape2)    # melt()
+library(tidyr)       # pivot_longer()
 library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
 
