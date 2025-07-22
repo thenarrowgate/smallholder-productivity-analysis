@@ -75,9 +75,8 @@ df_ord_factored <- df_ord %>% mutate(across(everything(), ordered))
 df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 
 # Step 6 ─ Reassemble a single data frame and remove incomplete cases
-# Nominal variables could be appended here after appropriate coding.  Only
-# columns with no missing values are kept for EFA.
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored) # + df_nom if processed
+# Only columns with no missing values are kept for EFA.
+df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
 # Step 7 ─ Sanity check the columns
