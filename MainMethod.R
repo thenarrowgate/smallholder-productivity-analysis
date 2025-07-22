@@ -134,7 +134,10 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   diag(R_mixed) <- 1
   
   # Ensure positive-definite matrix for suitability tests
-  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
+  # nearPD() was previously used here but tended to distort the matrix,
+  # leading to spuriously low KMO values. psych::cor.smooth applies a
+  # minimal eigenvalue adjustment instead.
+  R_mixed <- psych::cor.smooth(R_mixed)
 }
 
 stopifnot(!any(is.na(R_mixed)))
