@@ -645,6 +645,50 @@ print(summary(gam_fit)$p.table)
 par(mfrow = c(1, ncol(F_hat)))
 plot(gam_fit, pages = 1, all.terms = TRUE, shade = TRUE)
 
+# ---- Additional diagnostics for the GAM fit ----
+# 1. Overall deviance explained (R^2)
+dev_expl <- summary(gam_fit)$dev.expl
+cat("Deviance explained:", round(dev_expl, 3), "\n")
 
+# 2. Concurvity check
+concurv <- mgcv::concurvity(gam_fit)
+print(concurv)
 
+# 3. Residual plots
+par(mfrow = c(1, 1))
+plot(gam_fit, residuals = TRUE)
 
+param_terms <- summary(gam_fit)$pTerms.table
+if (!is.null(param_terms) && nrow(param_terms) > 0) {
+  p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
+  print(p_adj)
+  signif_terms <- rownames(param_terms)[p_adj < 0.05]
+} else {
+  p_adj <- numeric(0)
+  signif_terms <- character(0)
+}
+
+# 5. Refit using only significant parametric terms and compare AIC
+refit_terms <- c(smooth_terms, signif_terms, large_terms)
+if (length(refit_terms) == 0) {
+  refit_form <- as.formula("prod_index ~ 1")
+} else {
+  refit_form <- as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+}
+gam_refit <- mgcv::gam(refit_form, data = gam_df, method = "REML", select = TRUE)
+cat("AIC(original)=", AIC(gam_fit), " AIC(refit)=", AIC(gam_refit), "\n")
+
+print(summary(gam_refit)$s.table)
+print(summary(gam_refit)$p.table)
+
+par(mfrow = c(1, ncol(F_hat)))
+plot(gam_refit, pages = 1, all.terms = TRUE, shade = TRUE)
+
+# Check basis dimension adequacy
+gam.check(gam_refit)          # k-index; want > ~0.9 and p>0.05
+
+# Concurvity reduced?
+mgcv::concurvity(gam_refit)
+
+# Compare nested models formally
+anova(gam_fit, gam_refit, test="Chisq")  # uses ML; may need method="ML" refits
