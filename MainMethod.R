@@ -361,7 +361,7 @@ R_prune <- R_mixed[keep, keep]
 # removed.  The resulting correlation matrix feeds into a final bootstrap
 # to compute Tucker's phi and Hancock's H.
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.3]
+drop_comm <- names(h2)[h2<0.2718]
 if(length(drop_comm)) message("Dropping low-h² (<.25): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
