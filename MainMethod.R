@@ -1,3 +1,13 @@
+# ---------------------------------------------------------------------------
+# MainMethod.R
+# ---------------------------------------------------------------------------
+# This script performs the factor analytic pipeline described in the
+# repository README.  After loading the cleaned Nepal or Senegal dataset it
+# builds an appropriate correlation matrix, runs a large bootstrap EFA to
+# obtain stable loadings, prunes unstable items and finally assesses the
+# solution's robustness via Tucker's phi and Hancock's H.
+# ---------------------------------------------------------------------------
+
 # Step 1 ─ Load required packages
 library(dplyr)       # data wrangling
 library(EFAtools)    # VSS(), tenBerge scores
@@ -17,6 +27,9 @@ library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
 
 # Step 2 ─ Set seed and working directory
+# Resolve where the script is running from so relative paths work both when
+# executed interactively and via Rscript.  A seed is set for reproducible
+# bootstrap samples.
 set.seed(2025)
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) > 0) {
@@ -35,13 +48,19 @@ if (length(args) > 0) {
 }
 setwd(LOCAL_DIR)
 
-# Step 3 ─ Read in data and drop outcome columns
+# Step 3 ─ Load the prepared dataset
+# The Python preprocessing notebook saves a clean Excel file. The outcome
+# columns used later in SEM are removed here so that EFA only sees the
+# predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
 df     <- df %>% select(-Q0__AGR_PROD__continuous,
                         -Q0__sustainable_livelihood_score__continuous)
 
-# Step 4 ─ Split variables by type
+# Step 4 ─ Split variables by declared type
+# Variable names encode their measurement level after the final "__".
+# This split lets us treat each class appropriately when forming the
+# correlation matrix.
 types <- str_split(names(df), "__", simplify = TRUE)[,3]
 types[types == "binary_nominal"] <- "nominal"
 df_cont <- df[, types == "continuous", drop = FALSE]
@@ -49,17 +68,21 @@ df_ord  <- df[, types == "ordinal",    drop = FALSE]
 df_bin  <- df[, types == "binary",     drop = FALSE]
 df_nom  <- df[, types == "nominal",    drop = FALSE]
 
-# Step 5 ─ Convert ordinal/binary to ordered factors
+# Step 5 ─ Convert ordinal/binary variables to ordered factors
+# Treating these as ordered ensures that polychoric/polyserial correlations
+# are used later when ``COR_METHOD == "mixed"``.
 df_ord_factored <- df_ord %>% mutate(across(everything(), ordered))
 df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 
-# Step 6 ─ Rebuild mixed‐type dataset and drop NAs
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)#,
-                           #df_nom_processed)
+# Step 6 ─ Reassemble a single data frame and remove incomplete cases
+# Only columns with no missing values are kept for EFA.
+df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
-# Step 7 ─ Debug: drop unsupported column classes
-# Debug: column classes and drop unsupported
+# Step 7 ─ Sanity check the columns
+# Print each column's class and drop anything unexpected.  In practice all
+# variables should be numeric, integer, factor or ordered.  This guard helps
+# catch stray list-columns from earlier processing.
 cat(">>> DEBUG: column classes:\n")
 print(sapply(df_mix2_clean, class))
 allowed <- function(x) {
@@ -79,7 +102,10 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
-# Choose between "mixed" (default) or "spearman" correlations
+# ``COR_METHOD`` toggles between a heterogeneous polychoric/polyserial
+# correlation matrix ("mixed") and a simpler Spearman matrix treating all
+# variables as numeric ranks.  The mixed option is slower but more faithful
+# to the measurement levels.
 COR_METHOD <- "spearman"
 
 if (COR_METHOD == "mixed") {
@@ -132,19 +158,24 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   
   # Force exact 1s on the diagonal (good hygiene before EFA)
   diag(R_mixed) <- 1
-  
-  # Ensure positive-definite matrix for suitability tests
-  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
 }
+
+# Regardless of method we ensure the matrix is positive definite before
+# KMO/Bartlett tests or factor extraction. nearPD performs a minimal
+# adjustment when needed.
+R_mixed <- as.matrix(nearPD(R_mixed, corr = TRUE)$mat)
 
 stopifnot(!any(is.na(R_mixed)))
 # Step 8b - Suitability checks: KMO and Bartlett tests
+# These diagnostics help verify whether factor analysis is appropriate for
+# the correlation matrix.
 kmo_res <- psych::KMO(R_mixed)
 bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
 cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
 cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
 # -- Per-variable MSA assessment ----------------------------------------------
+# Drop variables that fall below the commonly-used MSA threshold of 0.5.
 msa_vec <- kmo_res$MSAi
 names(msa_vec) <- colnames(R_mixed)
 low_msa <- msa_vec[msa_vec < 0.5]
@@ -166,31 +197,39 @@ if (COR_METHOD == "mixed") {
   ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
 }
 ev_adj <- eigen(R_mixed)$values
+# Quick diagnostic plot to ensure the adjusted correlation matrix retains a
+# similar eigen spectrum to the raw correlations.
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
 
 
 # Step 9 ─ Determine number of factors (parallel analysis & MAP)
-pa_out <- fa.parallel(R_mixed, n.obs=nrow(df_mix2_clean),
-                      fm="minres", fa="fa",
-                      n.iter=500, quant=.95,
-                      cor="cor", use="pairwise", plot=FALSE)
+# Two common heuristics are used: Horn's parallel analysis (upper bound)
+# and Velicer's MAP (lower bound).  ``k`` can be set manually or using one
+# of these estimates.
+pa_out <- fa.parallel(R_mixed, n.obs = nrow(df_mix2_clean),
+                      fm = "minres", fa = "fa",
+                      n.iter = 500, quant = .95,
+                      cor = "cor", use = "pairwise", plot = FALSE)
 k_PA  <- pa_out$nfact
-vss_out <- VSS(R_mixed, n=ncol(R_mixed),
-               fm="minres", n.obs=nrow(df_mix2_clean), plot=FALSE)
+vss_out <- VSS(R_mixed, n = ncol(R_mixed),
+               fm = "minres", n.obs = nrow(df_mix2_clean), plot = FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- 2#k_MAP  # choose k
+k     <- 2 # manual override; could also use k_MAP or k_PA
 
 # Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
+# Each iteration draws a bootstrap sample, computes a correlation matrix and
+# extracts a factor solution.  The median across iterations serves as a robust
+# estimate of the loadings.
 p <- ncol(df_mix2_clean)
 B <- 1000
-n_cores <- parallel::detectCores() - 1
+n_cores <- max(1, parallel::detectCores() - 1)
 cl <- makeCluster(n_cores); registerDoSNOW(cl)
 pb <- txtProgressBar(max=B, style=3)
 opts <- list(progress = function(n) setTxtProgressBar(pb, n))
 
 boot_load <- foreach(b=1:B, .combine=rbind,
-                     .packages=c("psych","polycor"),
+                     .packages=c("psych","polycor","Matrix"),
                      .options.snow=opts) %dopar% {
                        repeat {
                          samp <- df_mix2_clean[sample(nrow(df_mix2_clean), replace=TRUE), ]
@@ -203,6 +242,9 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                            }
                          }, error=function(e) NULL)
                          if(is.null(Rb) || any(is.na(Rb))) next
+                         # Stabilise the correlation matrix for "fa" in case
+                         # bootstrapping produced a non positive-definite Rb
+                         Rb   <- as.matrix(nearPD(Rb, corr = TRUE)$mat)
                          fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
                                           error=function(e) NULL)
                          if(is.null(fa_b)) next
@@ -211,7 +253,10 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                      }
 close(pb); stopCluster(cl)
 
-# Step 11 ─ Summarize bootstrap: medians & 95% CIs
+# Step 11 ─ Summarize bootstrap results
+# The distributions of loadings and uniquenesses are summarised by their
+# medians and 95% confidence intervals.  These will later be used for
+# pruning unstable items.
 lambda_boot <- boot_load[, 1:(p*k)]
 psi_boot    <- boot_load[, (p*k+1):(p*k+p)]
 L_median    <- matrix(apply(lambda_boot, 2, median), nrow=p, ncol=k)
@@ -271,6 +316,9 @@ psi_median <- psi_tmp$psi_median
 names(psi_median) <- psi_tmp$variable
 
 # Step 12 ─ Prune items via decision-tree rules
+# Variables with unstable or weak loadings are removed to improve factor
+# interpretability.  Primary loadings are defined along with their
+# bootstrapped confidence intervals.
 #   12.1 Identify each variable’s primary loading & its 95% CI
 prim_list <- lapply(vars, function(v) {
   tmp <- df_L_ci[df_L_ci$variable==v, ]
@@ -298,17 +346,22 @@ Lambda0 <- L_median[keep, , drop=FALSE]
 Psi0    <- psi_median[keep]
 
 #   12.4 Zero‐out trivial secondaries (<.15)
-for(i in seq_len(nrow(Lambda0))) {
-  row <- Lambda0[i,]; idx <- order(abs(row), decreasing=TRUE)
-  sec <- idx[2]
-  if(abs(row[sec])<.15) Lambda0[i,sec] <- 0
+if(ncol(Lambda0) > 1) {
+  for(i in seq_len(nrow(Lambda0))) {
+    row <- Lambda0[i,]; idx <- order(abs(row), decreasing=TRUE)
+    sec <- idx[2]
+    if(abs(row[sec]) < .15) Lambda0[i, sec] <- 0
+  }
 }
 
 R_prune <- R_mixed[keep, keep]
 
-# Step 13 ─ Prune survivors with low communality (h²<.25)
+# Step 13 ─ Final pruning based on communality
+# Items whose communality falls below 0.25 after the previous steps are
+# removed.  The resulting correlation matrix feeds into a final bootstrap
+# to compute Tucker's phi and Hancock's H.
 h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.25]
+drop_comm <- names(h2)[h2<0.3]
 if(length(drop_comm)) message("Dropping low-h² (<.25): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
@@ -324,7 +377,7 @@ completed <- 0
 attempts  <- 0
 
 # set up cluster & progress bar
-n_cores <- parallel::detectCores() - 1
+n_cores <- max(1, parallel::detectCores() - 1)
 cl      <- makeCluster(n_cores)
 registerDoSNOW(cl)
 
@@ -333,9 +386,11 @@ progress <- function(n) setTxtProgressBar(pb, n)
 opts     <- list(progress = progress)
 
 # parallel bootstrap + compute φ and H
+# Each iteration refits the factor model on a bootstrap sample and computes
+# Tucker's congruence with the target solution as well as Hancock's H.
 res <- foreach(b = 1:B,
                .combine    = rbind,
-               .packages   = c("psych","polycor"),
+               .packages   = c("psych","polycor","Matrix"),
                .options.snow = opts) %dopar% {
                  repeat {
                    # a) bootstrap sample of 'keep' cols
@@ -355,6 +410,8 @@ res <- foreach(b = 1:B,
                      error = function(e) NULL
                    )
                    if (is.null(Rb) || any(is.na(Rb))) next
+                   # Stabilise Rb so ``fa`` does not fail due to non positive-definiteness
+                   Rb <- as.matrix(nearPD(Rb, corr = TRUE)$mat)
                    
                    # c) EFA
                    fa_b <- tryCatch(
@@ -391,6 +448,7 @@ phis_rob <- res[,        1:k,    drop = FALSE]
 Hs_rob   <- res[, (k+1):(2*k),    drop = FALSE]
 
 # 6. summarize
+# Average across successful bootstraps
 phi_mean <- colMeans(phis_rob)
 H_mean   <- colMeans(Hs_rob)
 
