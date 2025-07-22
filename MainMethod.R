@@ -288,33 +288,11 @@ df_psi_ci <- data.frame(
 )
 
 
-# Write medians and CIs to CSV
-write.csv(L_median,        "L_median_sngl.csv",   row.names = TRUE)
-write.csv(df_L_ci,         "L_ci_long_sngl.csv",  row.names = FALSE)
-write.csv(data.frame(variable = vars,
-                     psi_median = psi_median),
-          "psi_median_sngl.csv", row.names = FALSE)
-write.csv(df_psi_ci,       "psi_ci_sngl.csv",     row.names = FALSE)
-
-# Reload L_median (matrix, preserving row names)
-L_median <- as.matrix(
-  read.csv("L_median_sngl.csv",
-           row.names   = 1,
-           check.names = FALSE)
-)
-
-vars <- rownames(L_median)
-
-# Reload df_L_ci
-df_L_ci <- read.csv("L_ci_long_sngl.csv",
-                    stringsAsFactors = FALSE,
-                    check.names      = FALSE)
-
-# Reload psi_median (named vector)
-psi_tmp    <- read.csv("psi_median_sngl.csv", stringsAsFactors = FALSE,
-                       check.names = FALSE)
-psi_median <- psi_tmp$psi_median
-names(psi_median) <- psi_tmp$variable
+# The bootstrapped summaries remain in memory so they can be used directly
+# without the intermediate CSV round trip.  ``L_median`` and ``df_L_ci`` hold
+# the factor loading medians and confidence intervals, while ``psi_median`` and
+# ``df_psi_ci`` contain the uniqueness summaries.  These objects will feed into
+# the pruning step below.
 
 # Step 12 ─ Prune items via decision-tree rules
 # Variables with unstable or weak loadings are removed to improve factor
