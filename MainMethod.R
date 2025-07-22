@@ -79,6 +79,28 @@ df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
 df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
+# Step 6b ─ Drop extremely imbalanced binary variables -----------------------
+# Binary variables with a very small minority category can distort
+# correlations.  Here we remove any ``__binary`` columns where the
+# minority proportion falls below ``imbalance_thresh``.
+imbalance_thresh <- 0.05
+bin_cols <- grep("__binary", names(df_mix2_clean), value = TRUE)
+if (length(bin_cols) > 0) {
+  get_min_prop <- function(x) {
+    tab <- table(x)
+    if (length(tab) == 0) return(0)
+    min(tab) / sum(tab)
+  }
+  bin_props <- sapply(df_mix2_clean[bin_cols], get_min_prop)
+  drop_bin  <- names(bin_props)[bin_props < imbalance_thresh]
+  if (length(drop_bin) > 0) {
+    message("Dropping imbalanced binary variables (<", imbalance_thresh,
+            " minority prop): ", paste(drop_bin, collapse = ", "))
+    df_mix2_clean <- df_mix2_clean[, !names(df_mix2_clean) %in% drop_bin,
+                                   drop = FALSE]
+  }
+}
+
 # Step 7 ─ Sanity check the columns
 # Print each column's class and drop anything unexpected.  In practice all
 # variables should be numeric, integer, factor or ordered.  This guard helps
