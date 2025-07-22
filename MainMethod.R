@@ -58,6 +58,26 @@ df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)#,
                            #df_nom_processed)
 df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
+# Step 6b ─ Drop binary columns with extreme imbalance
+BIN_PROP_THRESH <- 0.05
+types_tmp <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[,3]
+bin_idx <- which(types_tmp == "binary")
+if (length(bin_idx) > 0) {
+  bin_names <- names(df_mix2_clean)[bin_idx]
+  minor_props <- sapply(bin_names, function(cn) {
+    tab <- table(df_mix2_clean[[cn]])
+    min(tab) / sum(tab)
+  })
+  drop_bin <- bin_names[minor_props < BIN_PROP_THRESH]
+  if (length(drop_bin) > 0) {
+    cat("Dropping rare binary columns (<", BIN_PROP_THRESH,
+        " minority proportion):\n")
+    print(drop_bin)
+    df_mix2_clean <- df_mix2_clean[, !(names(df_mix2_clean) %in% drop_bin),
+                                   drop = FALSE]
+  }
+}
+
 # Step 7 ─ Debug: drop unsupported column classes
 # Debug: column classes and drop unsupported
 cat(">>> DEBUG: column classes:\n")
