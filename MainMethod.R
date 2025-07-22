@@ -157,6 +157,10 @@ if (length(low_msa) > 0) {
 } else {
   cat("No variables dropped for low MSA\n")
 }
+# Re-check KMO after dropping low-MSA variables
+kmo_res2 <- psych::KMO(R_mixed)
+cat("Updated KMO overall MSA:", round(kmo_res2$MSA, 3), "\n")
+
 
 
 if (COR_METHOD == "mixed") {
