@@ -83,8 +83,12 @@ cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 COR_METHOD <- "spearman"
 
 if (COR_METHOD == "mixed") {
-  het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-  R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+  # `polycor::hetcor` can be unstable with small samples and many categorical
+  # levels. The `psych` package offers `mixedCor`, which estimates pairwise
+  # polychoric/polyserial correlations and tends to give a more factorable
+  # matrix. This helps prevent artificially low KMO values.
+  mc_out  <- psych::mixedCor(df_mix2_clean, correct=0, global=FALSE)
+  R_mixed <- mc_out$rho
 } else if (COR_METHOD == "spearman") {
   df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
   R_mixed <- cor(df_numeric, method = "spearman", use = "pairwise.complete.obs")
@@ -162,12 +166,12 @@ if (length(low_msa) > 0) {
 }
 
 
-if (COR_METHOD == "mixed") {
-  ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
-} else {
-  df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
-  ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
-}
+  if (COR_METHOD == "mixed") {
+    ev_raw <- eigen(psych::mixedCor(df_mix2_clean, correct=0, global=FALSE)$rho)$values
+  } else {
+    df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
+    ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
+  }
 ev_adj <- eigen(R_mixed)$values
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
