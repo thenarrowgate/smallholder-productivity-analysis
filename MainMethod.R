@@ -77,6 +77,13 @@ print(sapply(df_mix2_clean, class))
 (df_mix2_clean <- as.data.frame(df_mix2_clean))
 cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
+# Recompute type vector *after* dropping columns so it aligns with df_mix2_clean
+types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
+types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
+
+cont_idx <- which(types_clean == "continuous")
+ord_idx  <- which(types_clean == "ordinal")
+bin_idx  <- which(types_clean == "binary")
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
 # Choose between "mixed" (default) or "spearman" correlations
@@ -90,7 +97,14 @@ if (COR_METHOD == "mixed") {
   df_cor_ready <- df_mix2_clean %>%
     mutate(across(where(is.character), as.factor),
            across(where(is.logical),   as.numeric))
-  mc_out  <- psych::mixedCor(df_cor_ready, correct = 0, global = FALSE)
+  mc_out  <- psych::mixedCor(
+    df_cor_ready,
+    c = cont_idx,
+    p = ord_idx,
+    d = bin_idx,
+    correct = 0,
+    global = FALSE
+  )
   R_mixed <- mc_out$rho
 } else if (COR_METHOD == "spearman") {
   df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
@@ -98,17 +112,6 @@ if (COR_METHOD == "mixed") {
 } else {
   stop("Unknown COR_METHOD")
 }
-
-# --- REBUILD type vector to align with df_mix2_clean ---------------------------
-# (We can't reuse `types` from Step 4 because columns were dropped.)
-types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
-types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
-
-# --- Identify continuous cols in the CLEANED data ------------------------------
-cont_idx <- which(types_clean == "continuous")
-
-# (Optional) quick report
-cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
 
 # --- Robust bicor for continuous block ----------------------------------------
 if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
