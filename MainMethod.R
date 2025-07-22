@@ -336,12 +336,12 @@ if(ncol(Lambda0) > 1) {
 R_prune <- R_mixed[keep, keep]
 
 # Step 13 ─ Final pruning based on communality
-# Items whose communality falls below 0.25 after the previous steps are
+# Items whose communality falls below 0.30 after the previous steps are
 # removed.  The resulting correlation matrix feeds into a final bootstrap
 # to compute Tucker's phi and Hancock's H.
 h2   <- rowSums(Lambda0^2)
 drop_comm <- names(h2)[h2<0.3]
-if(length(drop_comm)) message("Dropping low-h² (<.25): ", paste(drop_comm, collapse=", "))
+if(length(drop_comm)) message("Dropping low-h² (<.30): ", paste(drop_comm, collapse=", "))
 keep_final <- setdiff(keep, drop_comm)
 Lambda0    <- Lambda0[keep_final, , drop=FALSE]
 Psi0       <- Psi0[keep_final]
