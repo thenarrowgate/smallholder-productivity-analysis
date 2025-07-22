@@ -16,7 +16,11 @@ Before EFA, the script now checks variable suitability using the KMO and Bartlet
    ```bash
    conda env create -f environment.yml
    ```
-2. **R packages** – install the packages listed at the top of `MainMethod.R` (dplyr, EFAtools, lavaan, etc.).
+2. **R packages** – most libraries are installed via `apt.txt` during setup.
+   Remaining packages (EFAtools and Gifi) can be installed with:
+   ```bash
+   ./.setup/install_r_packages.sh
+   ```
 
 ## Running the Analysis
 - **Run preprocessing**
