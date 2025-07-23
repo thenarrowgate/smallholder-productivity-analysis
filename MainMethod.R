@@ -771,3 +771,46 @@ vis.gam(m_te, view = c("F1", "F2"), plot.type = "persp",
 m_add <- mgcv::gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
 anova(m_add, m_te, test = "Chisq")
 
+# ---------------------------------------------------------------------------
+# 21. Confirmatory factor analysis and SEM
+# ---------------------------------------------------------------------------
+# Use the pruned loading matrix ``Lambda0`` to build a lavaan model
+# where each variable loads only on its primary factor.  The structural
+# part regresses the productivity index on the two latent factors and
+# their interaction, reflecting the synergy observed in the GAM phase.
+
+# --- 21.1  Assemble measurement model from primary loadings ---------------
+prim_fac <- apply(abs(Lambda0), 1, function(row)
+  colnames(Lambda0)[which.max(row)])
+items_by_fac <- split(names(prim_fac), prim_fac)
+meas_lines <- vapply(names(items_by_fac), function(f)
+  paste0(f, " =~ ", paste(items_by_fac[[f]], collapse = " + ")),
+  character(1))
+
+# --- 21.2  Build full SEM specification ----------------------------------
+sem_lines <- c(meas_lines,
+               "prod_index ~ F1 + F2 + F1:F2")
+sem_model <- paste(sem_lines, collapse = "\n")
+cat("\nSEM model specification:\n", sem_model, "\n")
+
+# --- 21.3  Prepare data for lavaan ---------------------------------------
+df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
+df_sem$prod_index <- y_prod
+ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
+
+# --- 21.4  Fit CFA model --------------------------------------------------
+fit_cfa <- lavaan::cfa(paste(meas_lines, collapse = "\n"),
+                       data    = df_sem,
+                       ordered = ordered_vars,
+                       std.lv  = TRUE)
+cat("\n--- CFA summary ---\n")
+print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
+
+# --- 21.5  Fit SEM with latent interaction -------------------------------
+fit_sem <- lavaan::sem(sem_model,
+                       data    = df_sem,
+                       ordered = ordered_vars,
+                       std.lv  = TRUE)
+cat("\n--- SEM summary ---\n")
+print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
+
