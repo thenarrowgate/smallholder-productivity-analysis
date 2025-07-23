@@ -697,70 +697,38 @@ gam_res  <- fit_gam(gam_df, smooth_terms, small_terms, large_terms)
 gam_fit  <- gam_res$fit
 gam_refit <- gam_diagnostics(gam_fit, gam_df, gam_res$smooth_terms, gam_res$large_terms)
 
-# Compute the raw correlation between the two factor scores
-cor(F_hat[, 1], F_hat[, 2])
-
-# Test whether F₂ relates to productivity before controlling for F₁
-cor(F_hat)
-m_F2 <- mgcv::gam(y_prod ~ s(F_hat[, 2]), method = "REML")
-
-summary(m_F2)      # gives the p-value and % deviance explained
-anova(m_F2, gam_refit, test="Chisq")  # formally compare to a model that already has F1
-plot(m_F2, shade=TRUE)             # visualise the smooth
-
 # ------------------------------------------------------------------
-# 1.  Make sure the factor scores sit in the data frame
+#  Additional exploration of factor effects
 # ------------------------------------------------------------------
-gam_df$F1 <- F_hat[, 1]   # commercial / management intensity
-gam_df$F2 <- F_hat[, 2]   # wealth & psycho-social resources
 
-# ------------------------------------------------------------------
-# 2A.  **Binary varying-coefficient** version
-#      — lets the F1 smooth have a different shape for the top-F2
-#        households ( >  +1 SD ) versus the rest.
-# ------------------------------------------------------------------
-zF2          <- scale(gam_df$F2)[, 1]             # z-score for convenience
-gam_df$F2_hi <- factor(ifelse(zF2 > 1, "High", "Other"))
+# 1. Correlation matrix of factor scores
+print(cor(F_hat))
 
-m_vc <- mgcv::gam(
-  prod_index ~
-    s(F1) +                         # baseline F1 smooth
-    s(F1, by = F2_hi) +             # deviation for high-F2 farms
-    s(F2)                           # main (residual) effect of F2
-  , data   = gam_df
-  , method = "REML"
-)
+# 2. Univariate smooths for each factor
+for (f in colnames(F_hat)) {
+  form <- as.formula(paste("prod_index ~ s(", f, ")"))
+  m_single <- mgcv::gam(form, data = gam_df, method = "REML")
+  cat("\n--- Smooth effect for", f, "---\n")
+  print(summary(m_single))
+  plot(m_single, shade = TRUE)
+  anova(m_single, gam_refit, test = "Chisq")
+}
 
-cat("\n--- Varying-coefficient model (binary high-F2) ---\n")
-print(summary(m_vc))
-
-# Visualise: two over-laid F1 curves
-plot(m_vc, select = 1, main = "F1 effect: baseline (Other F2)")      # s(F1)
-plot(m_vc, select = 2, add = TRUE, col = 2)                          # s(F1)·HighF2
-legend("topleft", legend = c("Other F2", "High F2"), lwd = 2, col = 1:2)
-
-# Formal comparison with your previous refit that already contained F1
-anova(gam_refit, m_vc, test = "Chisq")
-
-
-# ------------------------------------------------------------------
-# 2B.  **Continuous tensor-product surface** version
-#      — estimates a smooth response surface f(F1, F2).
-# ------------------------------------------------------------------
-m_te <- mgcv::gam(
-  prod_index ~ te(F1, F2)           # 2-D smooth
-  , data   = gam_df
-  , method = "REML"
-)
-
-cat("\n--- Tensor interaction model (continuous F1 × F2) ---\n")
-print(summary(m_te))
-
-# Perspective or contour plot
-vis.gam(m_te, view = c("F1", "F2"), plot.type = "persp",
-        color = "heat", main = "Productivity surface f(F1, F2)")
-
-# Compare against an additive model with no interaction
-m_add <- mgcv::gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
-anova(m_add, m_te, test = "Chisq")
+# 3. Pairwise tensor-product interactions
+fac_names <- colnames(F_hat)
+if (length(fac_names) > 1) {
+  pairs <- combn(fac_names, 2, simplify = FALSE)
+  for (p in pairs) {
+    f1 <- p[1]; f2 <- p[2]
+    form_te  <- as.formula(paste("prod_index ~ te(", f1, ", ", f2, ")"))
+    form_add <- as.formula(paste("prod_index ~ s(", f1, ") + s(", f2, ")"))
+    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML")
+    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML")
+    cat("\n--- Tensor interaction model (", f1, " × ", f2, ") ---\n")
+    print(summary(m_te))
+    vis.gam(m_te, view = c(f1, f2), plot.type = "persp",
+            color = "heat", main = paste0("Productivity surface f(", f1, ", ", f2, ")"))
+    anova(m_add, m_te, test = "Chisq")
+  }
+}
 
