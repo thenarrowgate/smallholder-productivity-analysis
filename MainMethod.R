@@ -832,8 +832,7 @@ if (length(heywood_items)) {
 
 # Full SEM specification using LMS latent interaction
 sem_lines <- c(meas_int_lines,
-               "prod_index ~ F1 + F2 + F1_sq",
-               "prod_index ~ F1 xWITH F2")
+               "prod_index ~ F1 + F2 + F1_sq + F1:F2")
 sem_model <- paste(sem_lines, collapse = "\n")
 cat("\nSEM model specification:\n", sem_model, "\n")
 
