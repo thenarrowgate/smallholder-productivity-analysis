@@ -97,31 +97,43 @@ print(sapply(df_mix2_clean, class))
 (df_mix2_clean <- as.data.frame(df_mix2_clean))
 cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
 
+# -- Column type vector (after cleaning) --------------------------------------
+# We need this for mixed correlations and later steps.
+types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
+types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
+
+# Indices for variable types
+cont_idx <- which(types_clean == "continuous")
+ord_idx  <- which(types_clean == "ordinal")
+bin_idx  <- which(types_clean == "binary")
+
 
 # ── Step 8 ─ Compute correlation matrix ---------------------------------------
 # Choose between "mixed" (default) or "spearman" correlations
 COR_METHOD <- "mixed"
 
 if (COR_METHOD == "mixed") {
-  het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-  R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
+  # `polycor::hetcor` can be unstable with small samples and many categorical
+  # levels. The `psych` package offers `mixedCor`, which estimates pairwise
+  # polychoric/polyserial correlations and tends to give a more factorable
+  # matrix. This helps prevent artificially low KMO values. Explicitly pass the
+  # variable sets so that `mixedCor` does not reject non-numeric columns.
+  df_cor_ready <- df_mix2_clean %>%
+    mutate(across(where(is.character), as.factor),
+           across(where(is.logical),   as.numeric)) %>%
+    mutate(across(everything(), as.numeric))
+  mc_out  <- psych::mixedCor(df_cor_ready,
+                             c = cont_idx,
+                             p = ord_idx,
+                             d = bin_idx,
+                             correct = 0, global = FALSE)
+  R_mixed <- mc_out$rho
 } else if (COR_METHOD == "spearman") {
   df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
   R_mixed <- cor(df_numeric, method = "spearman", use = "pairwise.complete.obs")
 } else {
   stop("Unknown COR_METHOD")
 }
-
-# --- REBUILD type vector to align with df_mix2_clean ---------------------------
-# (We can't reuse `types` from Step 4 because columns were dropped.)
-types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
-types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
-
-# --- Identify continuous cols in the CLEANED data ------------------------------
-cont_idx <- which(types_clean == "continuous")
-
-# (Optional) quick report
-cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
 
 # --- Robust bicor for continuous block ----------------------------------------
 if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
@@ -154,7 +166,10 @@ if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
   diag(R_mixed) <- 1
   
   # Ensure positive-definite matrix for suitability tests
-  R_mixed <- as.matrix(nearPD(R_mixed, corr=TRUE)$mat)
+  # nearPD() was previously used here but tended to distort the matrix,
+  # leading to spuriously low KMO values. psych::cor.smooth applies a
+  # minimal eigenvalue adjustment instead.
+  R_mixed <- psych::cor.smooth(R_mixed)
 }
 
 stopifnot(!any(is.na(R_mixed)))
@@ -183,12 +198,22 @@ cat("Updated KMO overall MSA:", round(kmo_res2$MSA, 3), "\n")
 
 
 
-if (COR_METHOD == "mixed") {
-  ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
-} else {
-  df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
-  ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
-}
+  if (COR_METHOD == "mixed") {
+    types_ev <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[,3]
+    types_ev[types_ev == "binary_nominal"] <- "nominal"
+    cont_ev <- which(types_ev == "continuous")
+    ord_ev  <- which(types_ev == "ordinal")
+    bin_ev  <- which(types_ev == "binary")
+    df_ev <- df_mix2_clean %>%
+      mutate(across(where(is.character), as.factor),
+             across(where(is.logical),   as.numeric)) %>%
+      mutate(across(everything(), as.numeric))
+    ev_raw <- eigen(psych::mixedCor(df_ev, c = cont_ev, p = ord_ev,
+                                    d = bin_ev, correct=0, global=FALSE)$rho)$values
+  } else {
+    df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
+    ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
+  }
 ev_adj <- eigen(R_mixed)$values
 plot(ev_raw, ev_adj, main="Eigenvalue comparison")
 
