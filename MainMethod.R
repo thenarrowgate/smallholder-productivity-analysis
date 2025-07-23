@@ -795,6 +795,9 @@ df_sem$prod_index <- y_prod
 ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
 # Convert ordered factors to numeric so lavaan can use the MLR estimator
 df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], as.numeric)
+# Standardise numeric columns to mitigate extreme variance differences
+num_cols <- names(df_sem)[sapply(df_sem, is.numeric)]
+df_sem[num_cols] <- scale(df_sem[num_cols])
 
 # Reintroduce F1 curvature with a latent square term
 meas_sq_line <- "F1_sq =~ 1*F1"
@@ -832,7 +835,8 @@ if (length(heywood_items)) {
 
 # Full SEM specification using LMS latent interaction
 sem_lines <- c(meas_int_lines,
-               "prod_index ~ F1 + F2 + F1_sq + F1:F2")
+               "F1F2 =~ F1*F2",
+               "prod_index ~ F1 + F2 + F1_sq + F1F2")
 sem_model <- paste(sem_lines, collapse = "\n")
 cat("\nSEM model specification:\n", sem_model, "\n")
 
