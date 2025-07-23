@@ -813,22 +813,38 @@ meas_lines <- sapply(seq_len(ncol(Lambda0)), function(j) {
   paste0("F", j, " =~ ", paste(vars_j, collapse = " + "))
 })
 
+# indicator sets for each latent variable
+f1_vars <- names(which(Lambda0[, 1] != 0))
+f2_vars <- names(which(Lambda0[, 2] != 0))
+
+# create product indicators for quadratic and interaction terms
+library(semTools)
+
+prod_quad <- indProd(df_mix2_clean, var1 = f1_vars, var2 = f1_vars,
+                     meanC = TRUE, residualC = FALSE, doubleMC = TRUE)
+prod_int  <- indProd(df_mix2_clean, var1 = f1_vars, var2 = f2_vars,
+                     meanC = TRUE, residualC = FALSE, doubleMC = TRUE)
+
+# Assemble SEM dataset with products and outcome
+sem_df <- cbind(df_mix2_clean[, keep_final, drop = FALSE],
+                prod_quad, prod_int)
+sem_df$prod_index <- y_prod
+seed_var <- grep("Seedlings", names(df), ignore.case = TRUE, value = TRUE)[1]
+if (is.null(seed_var)) stop("Seedlings column not found")
+sem_df$Seedlings <- df[[seed_var]]
+
+quad_vars <- colnames(prod_quad)
+int_vars  <- colnames(prod_int)
+
 # Structural model with quadratic and interaction terms
 struct_lines <- c(
-  "F1_sq  =~ F1 XWITH F1",
-  "F1xF2  =~ F1 XWITH F2",
+  paste0("F1_sq =~ ", paste(quad_vars, collapse = " + ")),
+  paste0("F1xF2 =~ ", paste(int_vars, collapse = " + ")),
   "prod_index ~ F1 + tinyF2*F2 + F1_sq + F1xF2 + Seedlings"
 )
 
 # Combine pieces into a single model string
 bsem_model <- paste(c(meas_lines, struct_lines), collapse = "\n")
-
-# Assemble SEM dataset
-sem_df <- df_mix2_clean[, keep_final, drop = FALSE]
-sem_df$prod_index <- y_prod
-seed_var <- grep("Seedlings", names(df), ignore.case = TRUE, value = TRUE)[1]
-if (is.null(seed_var)) stop("Seedlings column not found")
-sem_df$Seedlings <- df[[seed_var]]
 
 # Weakly informative priors for all coefficients
 dp <- dpriors(beta = "normal(0,1)", lambda = "normal(0,1)", nu = "normal(0,1)")
