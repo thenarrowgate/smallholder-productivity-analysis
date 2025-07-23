@@ -793,6 +793,8 @@ df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
 df_sem$prod_index <- y_prod
 
 ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
+# Convert ordered factors to numeric so lavaan can use the MLR estimator
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], as.numeric)
 
 # Reintroduce F1 curvature with a latent square term
 meas_sq_line <- "F1_sq =~ 1*F1"
@@ -805,7 +807,6 @@ meas_int_lines <- c(
 # --- 21.3  Fit CFA model --------------------------------------------------
 fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
                        data       = df_sem,
-                       ordered    = ordered_vars,
                        std.lv     = TRUE,
                        estimator  = "MLR",
                        orthogonal = TRUE)
@@ -822,7 +823,6 @@ if (length(heywood_items)) {
   meas_int_lines <- c(meas_int_lines, free_lines)
   fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
                          data       = df_sem,
-                         ordered    = ordered_vars,
                          std.lv     = TRUE,
                          estimator  = "MLR",
                          orthogonal = TRUE)
@@ -840,7 +840,6 @@ cat("\nSEM model specification:\n", sem_model, "\n")
 # --- 21.5  Fit SEM with latent interaction -------------------------------
 fit_sem <- lavaan::sem(sem_model,
                        data       = df_sem,
-                       ordered    = ordered_vars,
                        std.lv     = TRUE,
                        estimator  = "MLR",
                        orthogonal = TRUE)
