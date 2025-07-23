@@ -29,6 +29,7 @@ dependencies:
   - r-boot
   - r-gifi
   - r-lavaan
+  - r-semtools
   - r-mgcv
   - r-polycor
   - r-psych

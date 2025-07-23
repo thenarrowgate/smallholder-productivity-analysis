@@ -20,8 +20,8 @@ Before EFA, the script now checks variable suitability using the KMO and Bartlet
    ```bash
    ./.setup/setup.sh
    ```
-   This script reads `apt.txt` (which includes `r-base`) and installs
-   the EFAtools and Gifi packages.
+   This script reads `apt.txt` (which includes `r-base` and `r-cran-semtools`) and installs
+   the EFAtools, Gifi and semTools packages.
 
 ## Running the Analysis
 - **Run preprocessing**
