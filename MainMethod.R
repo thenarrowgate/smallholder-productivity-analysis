@@ -780,65 +780,72 @@ anova(m_add, m_te, test = "Chisq")
 # part regresses the productivity index on the two latent factors and
 # their interaction, reflecting the synergy observed in the GAM phase.
 
-# --- 21.1  Assemble measurement model from primary loadings ---------------
+# --- 21.1  Assemble measurement model from the EFA primary loadings --------
 prim_fac <- apply(abs(Lambda0), 1, function(row)
   colnames(Lambda0)[which.max(row)])
 items_by_fac <- split(names(prim_fac), prim_fac)
+
 meas_lines <- vapply(names(items_by_fac), function(f)
   paste0(f, " =~ ", paste(items_by_fac[[f]], collapse = " + ")),
   character(1))
 
-# --- 21.2  Build full SEM specification ----------------------------------
-# Create product indicators so the latent interaction F1 × F2 can be modelled
-# (lavaan does not directly support the ":" operator for latent factors).
+# --- 21.2  Prepare the SEM data frame --------------------------------------
 df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
 df_sem$prod_index <- y_prod
 
+## keep ordinal variables, convert only to numeric *after* copy
 ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], as.numeric)
 
-# Build product indicators via semTools (needs numeric columns)
-prod_base <- df_sem
-prod_base[ordered_vars] <- lapply(prod_base[ordered_vars], as.numeric)
-num_cols_all <- names(prod_base)[sapply(prod_base, is.numeric)]
-prod_base[num_cols_all] <- scale(prod_base[num_cols_all])
-nprod <- length(items_by_fac[["F1"]]) * length(items_by_fac[["F2"]])
-prod_names <- paste0("F1F2_", seq_len(nprod))
-df_sem <- semTools::indProd(
-  data   = prod_base,
-  var1   = items_by_fac[["F1"]],
-  var2   = items_by_fac[["F2"]],
-  match  = FALSE,
-  meanC  = TRUE,
-  namesProd = prod_names
-)
-int_indicators <- setdiff(colnames(df_sem), colnames(prod_base))
-df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
+## (optional) standardise continuous variables
+num_cols <- names(df_sem)[sapply(df_sem, is.numeric)]
+df_sem[num_cols] <- scale(df_sem[num_cols])
 
-# Measurement model including the interaction factor
-meas_int_lines <- c(
-  meas_lines,
-  paste0("F1F2 =~ ", paste(int_indicators, collapse = " + "))
-)
+# --- 21.3  Add latent quadratic and interaction terms ----------------------
+meas_sq_line <- "F1_sq =~ F1 * F1"   # proper quadratic (no duplicate factor)
+int_line     <- "F1F2   =~ F1 * F2"  # latent interaction
 
-# Full SEM specification with the latent interaction factor regressing prod_index
-sem_lines <- c(meas_int_lines,
-               "prod_index ~ F1 + F2 + F1F2")
-sem_model <- paste(sem_lines, collapse = "\n")
-cat("\nSEM model specification:\n", sem_model, "\n")
+meas_int_lines <- c(meas_lines, meas_sq_line)
 
-# --- 21.3  Fit CFA model --------------------------------------------------
-fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
-                       data    = df_sem,
-                       ordered = ordered_vars,
-                       std.lv  = TRUE)
+# --- 21.4  Fit the CFA (measurement model) --------------------------------
+fit_cfa <- cfa(paste(meas_int_lines, collapse = "\n"),
+               data       = df_sem,
+               std.lv     = TRUE,
+               estimator  = "MLR")       # <-- NO orthogonal = TRUE
+
 cat("\n--- CFA summary ---\n")
 print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
 
-# --- 21.5  Fit SEM with latent interaction -------------------------------
-fit_sem <- lavaan::sem(sem_model,
-                       data    = df_sem,
-                       ordered = ordered_vars,
-                       std.lv  = TRUE)
+# --- 21.4b  Automatically free residual variances for Heywood cases --------
+theta_hat <- diag(inspect(fit_cfa, "theta"))
+heywood_items <- names(theta_hat)[theta_hat < 0]
+
+if (length(heywood_items)) {
+  cat("\nFreeing residual variances for Heywood items:\n",
+      paste(heywood_items, collapse = ", "), "\n")
+  free_lines <- paste0(heywood_items, " ~~ NA*", heywood_items)
+  meas_int_lines <- c(meas_int_lines, free_lines)
+  
+  fit_cfa <- cfa(paste(meas_int_lines, collapse = "\n"),
+                 data       = df_sem,
+                 std.lv     = TRUE,
+                 estimator  = "MLR")
+  
+  cat("\n--- CFA (Heywood-adjusted) summary ---\n")
+  print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
+}
+
+# --- 21.5  Specify and fit the full SEM ------------------------------------
+sem_lines <- c(meas_int_lines,
+               int_line,
+               "prod_index ~ F1 + F2 + F1_sq + F1F2")
+sem_model <- paste(sem_lines, collapse = "\n")
+cat("\nSEM model specification:\n", sem_model, "\n")
+
+fit_sem <- sem(sem_model,
+               data       = df_sem,
+               std.lv     = TRUE,
+               estimator  = "MLR")        # <-- still no orthogonal = TRUE
+
 cat("\n--- SEM summary ---\n")
 print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
-
