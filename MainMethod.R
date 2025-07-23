@@ -820,18 +820,46 @@ f2_vars <- names(which(Lambda0[, 2] != 0))
 # create product indicators for quadratic and interaction terms
 library(semTools)
 
-prod_quad <- indProd(df_mix2_clean, var1 = f1_vars, var2 = f1_vars,
-                     meanC = TRUE, residualC = FALSE, doubleMC = TRUE)
-prod_int  <- indProd(df_mix2_clean, var1 = f1_vars, var2 = f2_vars,
-                     meanC = TRUE, residualC = FALSE, doubleMC = TRUE)
+# Use indProd() to create quadratic and interaction product indicators.
+# Explicit names ensure the lavaan model matches the data exactly and
+# avoid issues with extremely long column names.
+prod_quad <- indProd(
+  df_mix2_clean,
+  var1      = f1_vars,
+  var2      = f1_vars,
+  match     = FALSE,
+  meanC     = TRUE,
+  residualC = FALSE,
+  doubleMC  = TRUE,
+  namesProd = paste0("Quad", seq_along(f1_vars))
+)
+
+prod_int  <- indProd(
+  df_mix2_clean,
+  var1      = f1_vars,
+  var2      = f2_vars,
+  match     = FALSE,
+  meanC     = TRUE,
+  residualC = FALSE,
+  doubleMC  = TRUE,
+  namesProd = paste0("Int", seq_len(length(f1_vars) * length(f2_vars)))
+)
 
 # Assemble SEM dataset with products and outcome
 sem_df <- cbind(df_mix2_clean[, keep_final, drop = FALSE],
                 prod_quad, prod_int)
 sem_df$prod_index <- y_prod
-seed_var <- grep("Seedlings", names(df), ignore.case = TRUE, value = TRUE)[1]
-if (is.null(seed_var)) stop("Seedlings column not found")
-sem_df$Seedlings <- df[[seed_var]]
+
+# --- one-hot encode the seedlings question ----------------------------
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (!seed_var %in% names(df)) {
+  stop("Seedlings column not found")
+}
+seed_fac    <- factor(df[[seed_var]])
+seed_dummies <- model.matrix(~ seed_fac - 1)
+colnames(seed_dummies) <- paste0("Seedling", seq_len(ncol(seed_dummies)))
+sem_df <- cbind(sem_df, seed_dummies)
+seed_vars <- colnames(seed_dummies)
 
 quad_vars <- colnames(prod_quad)
 int_vars  <- colnames(prod_int)
@@ -840,7 +868,10 @@ int_vars  <- colnames(prod_int)
 struct_lines <- c(
   paste0("F1_sq =~ ", paste(quad_vars, collapse = " + ")),
   paste0("F1xF2 =~ ", paste(int_vars, collapse = " + ")),
-  "prod_index ~ F1 + tinyF2*F2 + F1_sq + F1xF2 + Seedlings"
+  paste0(
+    "prod_index ~ F1 + tinyF2*F2 + F1_sq + F1xF2 + ",
+    paste(seed_vars, collapse = " + ")
+  )
 )
 
 # Combine pieces into a single model string
