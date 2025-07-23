@@ -844,78 +844,94 @@ print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
 
 
 # TESTING -------------------------------------------------------
-############################################################################
-# “QUADRATIC + INTERACTION” SEM — TEST SCRIPT                              #
-# - fixes non-numeric scaling, ordered-data + MLR clash, and identification #
-############################################################################
-library(lavaan)
+
+# ──────────────────────────────────────────────────────────────────────
+#  SEM: curvature (F1_parcl2) + latent interaction (F1F2) + Seedlings
+# ──────────────────────────────────────────────────────────────────────
 library(dplyr)
+library(semTools)
+library(lavaan)
 
-## 0.  Prep data -----------------------------------------------------------
-df_num <- df_sem %>%                                  # <— original SEM data
-  mutate(across(all_of(ordered_vars), as.numeric))    # treat ordered/binary as numeric
+## --------------------------------------------------------------------
+## 0.  Base data frame with manifest indicators + outcome
+## --------------------------------------------------------------------
+df_sem <- df_mix2_clean[, keep_final, drop = FALSE]   # pruned indicators
+df_sem$prod_index <- y_prod                           # outcome
 
-## 1.  Get *observed* factor scores under the CFA measurement model --------
-cfa_model <- '
-  F1 =~ Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous +
-        Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous +
-        Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous +
-        Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous +
-        Q112__Generally_speaking_how_would_you_define_your_farming__ordinal +
-        Q0__average_of_farming_practices__ordinal +
-        Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1
-  F2 =~ Q5__AgeYears__continuous +
-        Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous +
-        Q0__hope_total__continuous +
-        Q0__self_control_score__continuous
-'
-fit_cfa  <- cfa(cfa_model, data = df_num, std.lv = TRUE, estimator = "MLR")
-fscores  <- lavPredict(fit_cfa, method = "Bartlett")   # n × 2 matrix
-fscores  <- scale(fscores, scale = TRUE)               # z-score both factors
-colnames(fscores) <- c("F1_hat", "F2_hat")
-df_num   <- cbind(df_num, fscores)
+## --------------------------------------------------------------------
+## 1.  Seedlings 0/1 dummy  (re-attach from the raw Excel frame `df`)
+## --------------------------------------------------------------------
+seed_var <- grep("^Q56__For_vegetables_do_you_use_seedlings",
+                 names(df), value = TRUE)
+if (length(seed_var) != 1)
+  stop("❌  Seedlings column not found - check Excel headers.")
 
-## 2.  Orthogonalise & build interaction -----------------------------------
-df_num <- df_num %>%
-  mutate(
-    F1_c = as.numeric(scale(F1_hat, center = TRUE,  scale = FALSE)),   # mean-centre
-    F2_c = as.numeric(scale(F2_hat, center = TRUE,  scale = FALSE)),
-    F1F2_prod = F1_c * F2_c                                            # orthogonal product
-  )
+df_sem$Seedlings <- +(df[[seed_var]] != "Own_seed")   # 1 = bought/other
 
-# sanity check
-round(cor(df_num[, c("F1_c", "F2_c", "F1F2_prod")]), 3)
-#            F1_c  F2_c F1F2_prod
-# F1_c      1.000 0.xxx   0.000
-# F2_c      0.xxx 1.000   0.000
-# F1F2_prod 0.000 0.000   1.000
+## --------------------------------------------------------------------
+## 2.  Quadratic parcel of F1  (captures sigmoid curvature)
+## --------------------------------------------------------------------
+f1_inds        <- items_by_fac[["F1"]]                # vector of F1 indicators
+f1_num_matrix  <- scale(data.matrix(df_sem[ , f1_inds]))   # numeric + z-score
+df_sem$F1_parcl2 <- scale(rowMeans(f1_num_matrix^2),
+                          center = TRUE, scale = TRUE)[,1]
 
-## 3.  Parcel F1 for curvature ---------------------------------------------
-# simple 2-parcel median split of F1 indicators
-f1_inds <- c("Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous",
-             "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous",
-             "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
-             "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
-             "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
-             "Q0__average_of_farming_practices__ordinal",
-             "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1")
+## --------------------------------------------------------------------
+## 3.  Product indicators for latent interaction  F1 × F2
+## --------------------------------------------------------------------
+tmp_num <- df_sem
+tmp_num[ordered_vars] <- lapply(tmp_num[ordered_vars], as.numeric)  # numeric copy
+num_idx <- sapply(tmp_num, is.numeric)
+tmp_num[num_idx] <- scale(tmp_num[num_idx])                         # mean-centre
 
-tmp <- scale(df_num[ , f1_inds])              # z-scores (all numeric now)
-p1  <- rowMeans(tmp[ , 1:floor(length(f1_inds)/2) ])
-p2  <- rowMeans(tmp[ , (floor(length(f1_inds)/2)+1):length(f1_inds) ])
-df_num$F1_parc2 <- p2^2                       # squared second parcel
+prod_names <- paste0("F1F2_", seq_len(length(items_by_fac[["F1"]]) *
+                                        length(items_by_fac[["F2"]])))
 
-## 4.  Specify the SEM with *observed* scores -------------------------------
-sem_obs <- '
-  # structural only (measurement already in fscores)
-  prod_index ~ b1*F1_c + b2*F1_parc2 + b3*F2_c + b4*F1F2_prod
+df_sem <- indProd(
+  data       = tmp_num,
+  var1       = items_by_fac[["F1"]],
+  var2       = items_by_fac[["F2"]],
+  match      = FALSE,
+  meanC      = TRUE,
+  namesProd  = prod_names
+)
 
-  # residual covariance freed
-  Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1  ~~ Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous
-'
+##  restore ordered factors (indProd() coerced them to numeric)
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
 
-fit_obs <- sem(sem_obs, data = df_num, estimator = "MLR")   # all vars treated continuous
+## --------------------------------------------------------------------
+## 4.  SEM syntax
+## --------------------------------------------------------------------
+# measurement blocks
+meas_lines <- vapply(names(items_by_fac), function(f)
+  paste0(f, " =~ ", paste(items_by_fac[[f]], collapse = " + ")),
+  character(1))
 
-## 5.  Inspect
-summary(fit_obs, standardized = TRUE, fit.measures = TRUE)
+sem_lines <- c(
+  meas_lines,
+  paste0("F1F2 =~ ", paste(prod_names, collapse = " + ")),
+  "prod_index ~ b1*F1 + b2*F1_parcl2 + b3*F2 + b4*F1F2",
+  # optional mediation path (uncomment if you want to test it)
+  # "F1 ~ m1*F2",
+  # free residual covariance flagged in diagnostics
+  "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1 ~~ Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous"
+)
 
+sem_quad <- paste(sem_lines, collapse = "\n")
+
+cat(sem_quad)
+## --------------------------------------------------------------------
+## 5.  Fit the model (DWLS handles ordered indicators nicely)
+## --------------------------------------------------------------------
+fit_quad <- sem(
+  sem_quad,
+  data      = df_sem,
+  ordered   = ordered_vars,
+  estimator = "DWLS",
+  std.lv    = TRUE
+)
+
+## --------------------------------------------------------------------
+## 6.  Inspect the results
+## --------------------------------------------------------------------
+summary(fit_quad, fit.measures = TRUE, standardized = TRUE)
