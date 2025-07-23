@@ -790,3 +790,57 @@ if (length(fac_names) > 1) {
     plot_tensor_slices(m_te, gam_df, c(f1, f2))
   }
 }
+
+# ---------------------------------------------------------------------------
+# 21. Bayesian LP-SEM with weakly informative priors
+# ---------------------------------------------------------------------------
+
+# The Bayesian structural equation model uses the final EFA indicators to
+# measure two latent factors (F1, F2).  Quadratic (F1×F1) and interaction
+# (F1×F2) terms capture curvature and joint effects.  Weak priors regularise
+# the loadings and regressions.  A small direct path from F2 to productivity
+# lets us test whether the interaction subsumes its influence.  Seedlings is
+# the only exogenous dummy retained as a direct predictor.
+
+if (!requireNamespace("blavaan", quietly = TRUE)) {
+  install.packages("blavaan", repos = "https://cloud.r-project.org")
+}
+library(blavaan)
+
+# Build measurement part from the pruned loading matrix
+meas_lines <- sapply(seq_len(ncol(Lambda0)), function(j) {
+  vars_j <- names(which(Lambda0[, j] != 0))
+  paste0("F", j, " =~ ", paste(vars_j, collapse = " + "))
+})
+
+# Structural model with quadratic and interaction terms
+struct_lines <- c(
+  "F1_sq  =~ F1 XWITH F1",
+  "F1xF2  =~ F1 XWITH F2",
+  "prod_index ~ F1 + tinyF2*F2 + F1_sq + F1xF2 + Seedlings"
+)
+
+# Combine pieces into a single model string
+bsem_model <- paste(c(meas_lines, struct_lines), collapse = "\n")
+
+# Assemble SEM dataset
+sem_df <- df_mix2_clean[, keep_final, drop = FALSE]
+sem_df$prod_index <- y_prod
+seed_var <- grep("Seedlings", names(df), ignore.case = TRUE, value = TRUE)[1]
+if (is.null(seed_var)) stop("Seedlings column not found")
+sem_df$Seedlings <- df[[seed_var]]
+
+# Weakly informative priors for all coefficients
+dp <- dpriors(beta = "normal(0,1)", lambda = "normal(0,1)", nu = "normal(0,1)")
+
+fit_bayes <- bsem(
+  bsem_model,
+  data   = sem_df,
+  dp     = dp,
+  burnin = 1000,
+  sample = 4000,
+  adapt  = 1000,
+  seed   = 2025
+)
+
+print(summary(fit_bayes, standardized = TRUE))
