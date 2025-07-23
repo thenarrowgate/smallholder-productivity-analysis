@@ -593,7 +593,7 @@ ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
 # generalised additive model.  Nominal predictors are collapsed to an "Other"
 # level if a category represents fewer than 5% of observations.
 
-# --- 20.1  Compute Thurstone scores for the final items ---------------------raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
+# --- 20.1  Compute Bartlett scores for the final items ---------------------raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
 
 # 1.  Prepare the data matrix exactly as you did before
 raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
@@ -634,6 +634,7 @@ collapse_rare <- function(f, threshold = 0.05) {
   factor(f_new)
 }
 
+
 nom_collapsed <- df_nom %>% mutate(across(everything(), collapse_rare))
 is_large <- function(v) nlevels(v) > 10
 large_noms <- names(Filter(is_large, nom_collapsed))
@@ -643,133 +644,93 @@ small_noms <- names(Filter(Negate(is_large), nom_collapsed))
 gam_df <- data.frame(prod_index = y_prod, F_hat, nom_collapsed)
 gam_df <- na.omit(gam_df)
 
+fit_gam <- function(df, smooth_terms, small_terms, large_terms) {
+  all_terms <- c(smooth_terms, small_terms, large_terms)
+  form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
+  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE)
+  print(summary(fit)$s.table)
+  print(summary(fit)$p.table)
+  par(mfrow = c(1, ncol(F_hat)))
+  plot(fit, pages = 1, all.terms = TRUE, shade = TRUE)
+  list(fit = fit, smooth_terms = smooth_terms, large_terms = large_terms)
+}
+
+gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
+  cat("Deviance explained:", round(summary(fit)$dev.expl, 3), "\n")
+  print(mgcv::concurvity(fit))
+  par(mfrow = c(1, 1))
+  plot(fit, residuals = TRUE)
+
+  param_terms <- summary(fit)$pTerms.table
+  if (!is.null(param_terms) && nrow(param_terms) > 0) {
+    p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
+    print(p_adj)
+    signif_terms <- rownames(param_terms)[p_adj < 0.05]
+  } else {
+    signif_terms <- character(0)
+  }
+
+  refit_terms <- c(smooth_terms, signif_terms, large_terms)
+  refit_form <- if (length(refit_terms) == 0) {
+    as.formula("prod_index ~ 1")
+  } else {
+    as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+  }
+
+  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE)
+  cat("AIC(original)=", AIC(fit), " AIC(refit)=", AIC(refit), "\n")
+  print(summary(refit)$s.table)
+  print(summary(refit)$p.table)
+  par(mfrow = c(1, ncol(F_hat)))
+  plot(refit, pages = 1, all.terms = TRUE, shade = TRUE)
+  gam.check(refit)                    # k-index; want > ~0.9 and p>0.05
+  mgcv::concurvity(refit)
+  anova(fit, refit, test = "Chisq")   # uses ML; may need method="ML" refits
+  refit
+}
+
 smooth_terms <- paste0("s(", colnames(F_hat), ")")
 small_terms  <- if (length(small_noms)) paste(small_noms, collapse = " + ") else NULL
 large_terms  <- if (length(large_noms)) paste0("s(", large_noms, ", bs='re')", collapse = " + ") else NULL
-all_terms <- c(smooth_terms, small_terms, large_terms)
-gam_form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
 
-gam_fit <- mgcv::gam(gam_form, data = gam_df, method = "REML", select = TRUE)
-print(summary(gam_fit)$s.table)
-print(summary(gam_fit)$p.table)
+gam_res  <- fit_gam(gam_df, smooth_terms, small_terms, large_terms)
+gam_fit  <- gam_res$fit
+gam_refit <- gam_diagnostics(gam_fit, gam_df, gam_res$smooth_terms, gam_res$large_terms)
 
-par(mfrow = c(1, ncol(F_hat)))
-plot(gam_fit, pages = 1, all.terms = TRUE, shade = TRUE)
+# ------------------------------------------------------------------
+#  Additional exploration of factor effects
+# ------------------------------------------------------------------
 
-# ---- Additional diagnostics for the GAM fit ----
-# 1. Overall deviance explained (R^2)
-dev_expl <- summary(gam_fit)$dev.expl
-cat("Deviance explained:", round(dev_expl, 3), "\n")
+# 1. Correlation matrix of factor scores
+print(cor(F_hat))
 
-# 2. Concurvity check
-concurv <- mgcv::concurvity(gam_fit)
-print(concurv)
-
-# 3. Residual plots
-par(mfrow = c(1, 1))
-plot(gam_fit, residuals = TRUE)
-
-param_terms <- summary(gam_fit)$pTerms.table
-if (!is.null(param_terms) && nrow(param_terms) > 0) {
-  p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
-  print(p_adj)
-  signif_terms <- rownames(param_terms)[p_adj < 0.05]
-} else {
-  p_adj <- numeric(0)
-  signif_terms <- character(0)
+# 2. Univariate smooths for each factor
+for (f in colnames(F_hat)) {
+  form <- as.formula(paste("prod_index ~ s(", f, ")"))
+  m_single <- mgcv::gam(form, data = gam_df, method = "REML")
+  cat("\n--- Smooth effect for", f, "---\n")
+  print(summary(m_single))
+  plot(m_single, shade = TRUE)
+  anova(m_single, gam_refit, test = "Chisq")
 }
 
-# 5. Refit using only significant parametric terms and compare AIC
-refit_terms <- c(smooth_terms, signif_terms, large_terms)
-if (length(refit_terms) == 0) {
-  refit_form <- as.formula("prod_index ~ 1")
-} else {
-  refit_form <- as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+# 3. Pairwise tensor-product interactions
+fac_names <- colnames(F_hat)
+if (length(fac_names) > 1) {
+  pairs <- combn(fac_names, 2, simplify = FALSE)
+  for (p in pairs) {
+    f1 <- p[1]; f2 <- p[2]
+    form_te  <- as.formula(paste("prod_index ~ te(", f1, ", ", f2, ")"))
+    form_add <- as.formula(paste("prod_index ~ s(", f1, ") + s(", f2, ")"))
+    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML")
+    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML")
+    cat("\n--- Tensor interaction model (", f1, " × ", f2, ") ---\n")
+    print(summary(m_te))
+    vis.gam(m_te, view = c(f1, f2), plot.type = "persp",
+            color = "heat", main = paste0("Productivity surface f(", f1, ", ", f2, ")"))
+    anova(m_add, m_te, test = "Chisq")
+  }
 }
-gam_refit <- mgcv::gam(refit_form, data = gam_df, method = "REML", select = TRUE)
-cat("AIC(original)=", AIC(gam_fit), " AIC(refit)=", AIC(gam_refit), "\n")
-
-print(summary(gam_refit)$s.table)
-print(summary(gam_refit)$p.table)
-
-par(mfrow = c(1, ncol(F_hat)))
-plot(gam_refit, pages = 1, all.terms = TRUE, shade = TRUE)
-
-# Check basis dimension adequacy
-gam.check(gam_refit)          # k-index; want > ~0.9 and p>0.05
-
-# Concurvity reduced?
-mgcv::concurvity(gam_refit)
-
-# Compare nested models formally
-anova(gam_fit, gam_refit, test="Chisq")  # uses ML; may need method="ML" refits
-
-# Compute the raw correlation between the two factor scores
-cor(F_hat[, 1], F_hat[, 2])
-
-# Test whether F₂ relates to productivity before controlling for F₁
-cor(F_hat)
-m_F2 <- mgcv::gam(y_prod ~ s(F_hat[, 2]), method = "REML")
-
-summary(m_F2)      # gives the p-value and % deviance explained
-anova(m_F2, gam_refit, test="Chisq")  # formally compare to a model that already has F1
-plot(m_F2, shade=TRUE)             # visualise the smooth
-
-# ------------------------------------------------------------------
-# 1.  Make sure the factor scores sit in the data frame
-# ------------------------------------------------------------------
-gam_df$F1 <- F_hat[, 1]   # commercial / management intensity
-gam_df$F2 <- F_hat[, 2]   # wealth & psycho-social resources
-
-# ------------------------------------------------------------------
-# 2A.  **Binary varying-coefficient** version
-#      — lets the F1 smooth have a different shape for the top-F2
-#        households ( >  +1 SD ) versus the rest.
-# ------------------------------------------------------------------
-zF2          <- scale(gam_df$F2)[, 1]             # z-score for convenience
-gam_df$F2_hi <- factor(ifelse(zF2 > 1, "High", "Other"))
-
-m_vc <- mgcv::gam(
-  prod_index ~
-    s(F1) +                         # baseline F1 smooth
-    s(F1, by = F2_hi) +             # deviation for high-F2 farms
-    s(F2)                           # main (residual) effect of F2
-  , data   = gam_df
-  , method = "REML"
-)
-
-cat("\n--- Varying-coefficient model (binary high-F2) ---\n")
-print(summary(m_vc))
-
-# Visualise: two over-laid F1 curves
-plot(m_vc, select = 1, main = "F1 effect: baseline (Other F2)")      # s(F1)
-plot(m_vc, select = 2, add = TRUE, col = 2)                          # s(F1)·HighF2
-legend("topleft", legend = c("Other F2", "High F2"), lwd = 2, col = 1:2)
-
-# Formal comparison with your previous refit that already contained F1
-anova(gam_refit, m_vc, test = "Chisq")
-
-
-# ------------------------------------------------------------------
-# 2B.  **Continuous tensor-product surface** version
-#      — estimates a smooth response surface f(F1, F2).
-# ------------------------------------------------------------------
-m_te <- mgcv::gam(
-  prod_index ~ te(F1, F2)           # 2-D smooth
-  , data   = gam_df
-  , method = "REML"
-)
-
-cat("\n--- Tensor interaction model (continuous F1 × F2) ---\n")
-print(summary(m_te))
-
-# Perspective or contour plot
-vis.gam(m_te, view = c("F1", "F2"), plot.type = "persp",
-        color = "heat", main = "Productivity surface f(F1, F2)")
-
-# Compare against an additive model with no interaction
-m_add <- mgcv::gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
-anova(m_add, m_te, test = "Chisq")
 
 # --- draw three slices of the tensor surface --------------------
 library(mgcv)
