@@ -593,7 +593,7 @@ ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
 # generalised additive model.  Nominal predictors are collapsed to an "Other"
 # level if a category represents fewer than 5% of observations.
 
-# --- 20.1  Compute Thurstone scores for the final items ---------------------raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
+# --- 20.1  Compute Bartlett scores for the final items ---------------------raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
 
 # 1.  Prepare the data matrix exactly as you did before
 raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
