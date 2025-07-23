@@ -15,10 +15,7 @@ library(boot)        # bootstrap()
 library(Gifi)        # princals()
 library(lavaan)      # sem()
 library(mgcv)        # gam()
-## Optional: additional GAM diagnostics
-if (requireNamespace("mgcViz", quietly = TRUE)) {
-  library(mgcViz)    # diagnostic tools for mgcv::gam
-}
+library(mgcViz)      # diagnostic tools for mgcv::gam
 library(polycor)     # hetcor()
 library(psych)       # mixedCor(), fa.*, factor.congruence(), factor.scores
 library(readxl)      # read_excel()
@@ -726,7 +723,7 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
       idx <- match(nm, smooth_terms)
       if (!is.na(idx)) {
         k_old <- refit$smooth[[idx]]$bs.dim
-        hi_terms[idx] <- sub("\)$",
+        hi_terms[idx] <- sub(")$",
                              paste0(", k=", k_old * 2, ")"),
                              hi_terms[idx])
       }
