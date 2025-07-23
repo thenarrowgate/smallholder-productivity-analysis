@@ -14,6 +14,7 @@ library(EFAtools)    # VSS(), tenBerge scores
 library(boot)        # bootstrap()
 library(Gifi)        # princals()
 library(lavaan)      # sem()
+library(semTools)    # indProd() for latent interactions
 library(mgcv)        # gam()
 library(polycor)     # hetcor()
 library(psych)       # mixedCor(), fa.*, factor.congruence(), factor.scores
@@ -788,18 +789,45 @@ meas_lines <- vapply(names(items_by_fac), function(f)
   character(1))
 
 # --- 21.2  Build full SEM specification ----------------------------------
-sem_lines <- c(meas_lines,
-               "prod_index ~ F1 + F2 + F1:F2")
+# Create product indicators so the latent interaction F1 × F2 can be modelled
+# (lavaan does not directly support the ":" operator for latent factors).
+df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
+df_sem$prod_index <- y_prod
+
+ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
+
+# Build product indicators via semTools (needs numeric columns)
+prod_base <- df_sem
+prod_base[ordered_vars] <- lapply(prod_base[ordered_vars], as.numeric)
+num_cols_all <- names(prod_base)[sapply(prod_base, is.numeric)]
+prod_base[num_cols_all] <- scale(prod_base[num_cols_all])
+nprod <- length(items_by_fac[["F1"]]) * length(items_by_fac[["F2"]])
+prod_names <- paste0("F1F2_", seq_len(nprod))
+df_sem <- semTools::indProd(
+  data   = prod_base,
+  var1   = items_by_fac[["F1"]],
+  var2   = items_by_fac[["F2"]],
+  match  = FALSE,
+  meanC  = TRUE,
+  namesProd = prod_names
+)
+int_indicators <- setdiff(colnames(df_sem), colnames(prod_base))
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
+
+# Measurement model including the interaction factor
+meas_int_lines <- c(
+  meas_lines,
+  paste0("F1F2 =~ ", paste(int_indicators, collapse = " + "))
+)
+
+# Full SEM specification with the latent interaction factor regressing prod_index
+sem_lines <- c(meas_int_lines,
+               "prod_index ~ F1 + F2 + F1F2")
 sem_model <- paste(sem_lines, collapse = "\n")
 cat("\nSEM model specification:\n", sem_model, "\n")
 
-# --- 21.3  Prepare data for lavaan ---------------------------------------
-df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
-df_sem$prod_index <- y_prod
-ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
-
-# --- 21.4  Fit CFA model --------------------------------------------------
-fit_cfa <- lavaan::cfa(paste(meas_lines, collapse = "\n"),
+# --- 21.3  Fit CFA model --------------------------------------------------
+fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
                        data    = df_sem,
                        ordered = ordered_vars,
                        std.lv  = TRUE)
