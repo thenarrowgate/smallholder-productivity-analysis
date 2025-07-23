@@ -820,6 +820,7 @@ f2_vars <- names(which(Lambda0[, 2] != 0))
 # create product indicators for quadratic and interaction terms
 library(semTools)
 
+
 # Use indProd() to create quadratic and interaction product indicators.
 # Explicit names ensure the lavaan model matches the data exactly and
 # avoid issues with extremely long column names.
