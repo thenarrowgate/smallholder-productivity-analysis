@@ -3,6 +3,7 @@ r-base
 r-cran-dplyr
 r-cran-boot
 r-cran-lavaan
+r-cran-semtools
 r-cran-mgcv
 r-cran-polycor
 r-cran-psych
