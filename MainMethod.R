@@ -820,12 +820,17 @@ f2_vars <- names(which(Lambda0[, 2] != 0))
 # create product indicators for quadratic and interaction terms
 library(semTools)
 
+# indProd() requires numeric inputs. Convert the factor indicators used in
+# the latent factors to numeric representations before generating the
+# latent polynomial products.
+prod_base <- df_mix2_clean %>%
+  mutate(across(all_of(c(f1_vars, f2_vars)), ~ as.numeric(as.character(.))))
 
 # Use indProd() to create quadratic and interaction product indicators.
 # Explicit names ensure the lavaan model matches the data exactly and
 # avoid issues with extremely long column names.
 prod_quad <- indProd(
-  df_mix2_clean,
+  prod_base,
   var1      = f1_vars,
   var2      = f1_vars,
   match     = FALSE,
@@ -836,7 +841,7 @@ prod_quad <- indProd(
 )
 
 prod_int  <- indProd(
-  df_mix2_clean,
+  prod_base,
   var1      = f1_vars,
   var2      = f2_vars,
   match     = FALSE,
@@ -846,9 +851,11 @@ prod_int  <- indProd(
   namesProd = paste0("Int", seq_len(length(f1_vars) * length(f2_vars)))
 )
 
-# Assemble SEM dataset with products and outcome
-sem_df <- cbind(df_mix2_clean[, keep_final, drop = FALSE],
-                prod_quad, prod_int)
+# Assemble SEM dataset with products and outcome. Convert the retained
+# indicators to numeric so that lavaan treats them correctly.
+sem_df_base <- df_mix2_clean[, keep_final, drop = FALSE] %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+sem_df <- cbind(sem_df_base, prod_quad, prod_int)
 sem_df$prod_index <- y_prod
 
 # --- one-hot encode the seedlings question ----------------------------
