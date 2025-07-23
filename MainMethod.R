@@ -15,6 +15,10 @@ library(boot)        # bootstrap()
 library(Gifi)        # princals()
 library(lavaan)      # sem()
 library(mgcv)        # gam()
+## Optional: additional GAM diagnostics
+if (requireNamespace("mgcViz", quietly = TRUE)) {
+  library(mgcViz)    # diagnostic tools for mgcv::gam
+}
 library(polycor)     # hetcor()
 library(psych)       # mixedCor(), fa.*, factor.congruence(), factor.scores
 library(readxl)      # read_excel()
@@ -661,6 +665,33 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
   par(mfrow = c(1, 1))
   plot(fit, residuals = TRUE)
 
+  # --- Residual checks -------------------------------------------------
+  if (requireNamespace("mgcViz", quietly = TRUE)) {
+    viz <- mgcViz::getViz(fit)
+    print(mgcViz::appraise(viz))        # QQ/scale-location
+    print(mgcViz::influence(viz))       # Cook's distance style plots
+  } else {
+    cat("mgcViz not installed: using base diagnostics\n")
+    qqnorm(resid(fit)); qqline(resid(fit))
+    plot(fitted(fit), sqrt(abs(resid(fit))),
+         ylab = "|residual|^0.5", xlab = "Fitted")
+  }
+  acf(resid(fit), main = "ACF of GAM residuals")
+
+  cv_deviance <- function(form, data, folds = 5) {
+    n <- nrow(data)
+    ids <- sample(rep(1:folds, length.out = n))
+    dev <- numeric(folds)
+    for (i in seq_len(folds)) {
+      m <- mgcv::gam(form, data = data[ids != i, ], method = "REML")
+      pr <- predict(m, newdata = data[ids == i, ])
+      dev[i] <- mean((data$prod_index[ids == i] - pr)^2)
+    }
+    mean(dev)
+  }
+  cv_dev <- cv_deviance(formula(fit), df)
+  cat("5-fold CV MSE:", signif(cv_dev, 3), "\n")
+
   param_terms <- summary(fit)$pTerms.table
   if (!is.null(param_terms) && nrow(param_terms) > 0) {
     p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
@@ -683,7 +714,35 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
   print(summary(refit)$p.table)
   par(mfrow = c(1, ncol(F_hat)))
   plot(refit, pages = 1, all.terms = TRUE, shade = TRUE)
-  gam.check(refit)                    # k-index; want > ~0.9 and p>0.05
+  chk <- mgcv::gam.check(refit)   # k-index; want > ~0.9 and p>0.05
+  print(chk)
+  low_k <- chk$k.check[, "k-index"] < 0.9
+  if (any(low_k)) {
+    bad <- rownames(chk$k.check)[low_k]
+    cat("Low k-index for:", paste(bad, collapse = ", "), "\n")
+
+    hi_terms <- smooth_terms
+    for (nm in bad) {
+      idx <- match(nm, smooth_terms)
+      if (!is.na(idx)) {
+        k_old <- refit$smooth[[idx]]$bs.dim
+        hi_terms[idx] <- sub("\)$",
+                             paste0(", k=", k_old * 2, ")"),
+                             hi_terms[idx])
+      }
+    }
+
+    hi_form <- as.formula(paste("prod_index ~", paste(c(hi_terms, signif_terms, large_terms), collapse = " + ")))
+    refit_hi <- mgcv::gam(hi_form, data = df, method = "REML", select = TRUE)
+    cat("AIC(high-k)=", AIC(refit_hi), "\n")
+    anova(refit, refit_hi, test = "Chisq")
+  }
+  alt_terms <- gsub("s\\(([^)]+)\\)", "s(\\1, bs='cs')", smooth_terms)
+  alt_form <- as.formula(paste("prod_index ~", paste(c(alt_terms, signif_terms, large_terms), collapse = " + ")))
+  gam_alt <- mgcv::gam(alt_form, data = df, method = "REML", select = TRUE)
+  cat("AIC(cs basis)=", AIC(gam_alt), "\n")
+  anova(refit, gam_alt, test = "Chisq")
+
   mgcv::concurvity(refit)
   anova(fit, refit, test = "Chisq")   # uses ML; may need method="ML" refits
   refit
