@@ -593,8 +593,11 @@ ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
 # generalised additive model.  Nominal predictors are collapsed to an "Other"
 # level if a category represents fewer than 5% of observations.
 
-# --- 20.1  Compute Ten Berge scores for the final items ---------------------
+# --- 20.1  Compute Thurstone scores for the final items ---------------------raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
+
+# 1.  Prepare the data matrix exactly as you did before
 raw_data <- df_mix2_clean[, keep_final, drop = FALSE]
+
 raw_data_num <- data.frame(lapply(raw_data, function(col) {
   if (is.numeric(col)) {
     col
@@ -605,13 +608,21 @@ raw_data_num <- data.frame(lapply(raw_data, function(col) {
   }
 }))
 
+# 2.  Z-score the observed variables                           (n × p)
 X_std <- scale(raw_data_num)
-Rzz   <- R_prune
-Rinv  <- solve(Rzz)
-Tmat  <- t(Lambda0) %*% Rinv %*% Lambda0
-Wten  <- (Rinv %*% Lambda0) %*% solve(Tmat)
-F_hat <- X_std %*% Wten
-colnames(F_hat) <- colnames(Lambda0)
+
+# 3.  Build Ψ⁻¹ once – Psi0 is your vector of uniquenesses     (p × p)
+Psi_inv <- diag(1 / Psi0)
+
+# 4.  Bartlett weight matrix:  W_B = Ψ⁻¹ Λ (Λᵀ Ψ⁻¹ Λ)⁻¹        (p × k)
+middle  <- t(Lambda0) %*% Psi_inv %*% Lambda0      # (k × k)
+W_B     <- Psi_inv %*% Lambda0 %*% solve(middle)   # (p × k)
+
+# 5.  Factor scores (these *retain* the F-to-F correlations)   (n × k)
+F_hat <- X_std %*% W_B
+
+# 6.  Keep the same labels so downstream code is unchanged
+colnames(F_hat) <- colnames(Lambda0)   # “F1”, “F2”, …
 rownames(F_hat) <- rownames(df_mix2_clean)
 
 # --- 20.2  Prepare nominal predictors --------------------------------------
@@ -692,3 +703,71 @@ mgcv::concurvity(gam_refit)
 
 # Compare nested models formally
 anova(gam_fit, gam_refit, test="Chisq")  # uses ML; may need method="ML" refits
+
+# Compute the raw correlation between the two factor scores
+cor(F_hat[, 1], F_hat[, 2])
+
+# Test whether F₂ relates to productivity before controlling for F₁
+cor(F_hat)
+m_F2 <- mgcv::gam(y_prod ~ s(F_hat[, 2]), method = "REML")
+
+summary(m_F2)      # gives the p-value and % deviance explained
+anova(m_F2, gam_refit, test="Chisq")  # formally compare to a model that already has F1
+plot(m_F2, shade=TRUE)             # visualise the smooth
+
+# ------------------------------------------------------------------
+# 1.  Make sure the factor scores sit in the data frame
+# ------------------------------------------------------------------
+gam_df$F1 <- F_hat[, 1]   # commercial / management intensity
+gam_df$F2 <- F_hat[, 2]   # wealth & psycho-social resources
+
+# ------------------------------------------------------------------
+# 2A.  **Binary varying-coefficient** version
+#      — lets the F1 smooth have a different shape for the top-F2
+#        households ( >  +1 SD ) versus the rest.
+# ------------------------------------------------------------------
+zF2          <- scale(gam_df$F2)[, 1]             # z-score for convenience
+gam_df$F2_hi <- factor(ifelse(zF2 > 1, "High", "Other"))
+
+m_vc <- mgcv::gam(
+  prod_index ~
+    s(F1) +                         # baseline F1 smooth
+    s(F1, by = F2_hi) +             # deviation for high-F2 farms
+    s(F2)                           # main (residual) effect of F2
+  , data   = gam_df
+  , method = "REML"
+)
+
+cat("\n--- Varying-coefficient model (binary high-F2) ---\n")
+print(summary(m_vc))
+
+# Visualise: two over-laid F1 curves
+plot(m_vc, select = 1, main = "F1 effect: baseline (Other F2)")      # s(F1)
+plot(m_vc, select = 2, add = TRUE, col = 2)                          # s(F1)·HighF2
+legend("topleft", legend = c("Other F2", "High F2"), lwd = 2, col = 1:2)
+
+# Formal comparison with your previous refit that already contained F1
+anova(gam_refit, m_vc, test = "Chisq")
+
+
+# ------------------------------------------------------------------
+# 2B.  **Continuous tensor-product surface** version
+#      — estimates a smooth response surface f(F1, F2).
+# ------------------------------------------------------------------
+m_te <- mgcv::gam(
+  prod_index ~ te(F1, F2)           # 2-D smooth
+  , data   = gam_df
+  , method = "REML"
+)
+
+cat("\n--- Tensor interaction model (continuous F1 × F2) ---\n")
+print(summary(m_te))
+
+# Perspective or contour plot
+vis.gam(m_te, view = c("F1", "F2"), plot.type = "persp",
+        color = "heat", main = "Productivity surface f(F1, F2)")
+
+# Compare against an additive model with no interaction
+m_add <- mgcv::gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
+anova(m_add, m_te, test = "Chisq")
+
