@@ -634,6 +634,7 @@ collapse_rare <- function(f, threshold = 0.05) {
   factor(f_new)
 }
 
+
 nom_collapsed <- df_nom %>% mutate(across(everything(), collapse_rare))
 is_large <- function(v) nlevels(v) > 10
 large_noms <- names(Filter(is_large, nom_collapsed))
@@ -643,66 +644,58 @@ small_noms <- names(Filter(Negate(is_large), nom_collapsed))
 gam_df <- data.frame(prod_index = y_prod, F_hat, nom_collapsed)
 gam_df <- na.omit(gam_df)
 
+fit_gam <- function(df, smooth_terms, small_terms, large_terms) {
+  all_terms <- c(smooth_terms, small_terms, large_terms)
+  form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
+  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE)
+  print(summary(fit)$s.table)
+  print(summary(fit)$p.table)
+  par(mfrow = c(1, ncol(F_hat)))
+  plot(fit, pages = 1, all.terms = TRUE, shade = TRUE)
+  list(fit = fit, smooth_terms = smooth_terms, large_terms = large_terms)
+}
+
+gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
+  cat("Deviance explained:", round(summary(fit)$dev.expl, 3), "\n")
+  print(mgcv::concurvity(fit))
+  par(mfrow = c(1, 1))
+  plot(fit, residuals = TRUE)
+
+  param_terms <- summary(fit)$pTerms.table
+  if (!is.null(param_terms) && nrow(param_terms) > 0) {
+    p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
+    print(p_adj)
+    signif_terms <- rownames(param_terms)[p_adj < 0.05]
+  } else {
+    signif_terms <- character(0)
+  }
+
+  refit_terms <- c(smooth_terms, signif_terms, large_terms)
+  refit_form <- if (length(refit_terms) == 0) {
+    as.formula("prod_index ~ 1")
+  } else {
+    as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
+  }
+
+  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE)
+  cat("AIC(original)=", AIC(fit), " AIC(refit)=", AIC(refit), "\n")
+  print(summary(refit)$s.table)
+  print(summary(refit)$p.table)
+  par(mfrow = c(1, ncol(F_hat)))
+  plot(refit, pages = 1, all.terms = TRUE, shade = TRUE)
+  gam.check(refit)                    # k-index; want > ~0.9 and p>0.05
+  mgcv::concurvity(refit)
+  anova(fit, refit, test = "Chisq")   # uses ML; may need method="ML" refits
+  refit
+}
+
 smooth_terms <- paste0("s(", colnames(F_hat), ")")
 small_terms  <- if (length(small_noms)) paste(small_noms, collapse = " + ") else NULL
 large_terms  <- if (length(large_noms)) paste0("s(", large_noms, ", bs='re')", collapse = " + ") else NULL
-all_terms <- c(smooth_terms, small_terms, large_terms)
-gam_form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
 
-gam_fit <- mgcv::gam(gam_form, data = gam_df, method = "REML", select = TRUE)
-print(summary(gam_fit)$s.table)
-print(summary(gam_fit)$p.table)
-
-par(mfrow = c(1, ncol(F_hat)))
-plot(gam_fit, pages = 1, all.terms = TRUE, shade = TRUE)
-
-# ---- Additional diagnostics for the GAM fit ----
-# 1. Overall deviance explained (R^2)
-dev_expl <- summary(gam_fit)$dev.expl
-cat("Deviance explained:", round(dev_expl, 3), "\n")
-
-# 2. Concurvity check
-concurv <- mgcv::concurvity(gam_fit)
-print(concurv)
-
-# 3. Residual plots
-par(mfrow = c(1, 1))
-plot(gam_fit, residuals = TRUE)
-
-param_terms <- summary(gam_fit)$pTerms.table
-if (!is.null(param_terms) && nrow(param_terms) > 0) {
-  p_adj <- p.adjust(param_terms[, "p-value"], method = "fdr")
-  print(p_adj)
-  signif_terms <- rownames(param_terms)[p_adj < 0.05]
-} else {
-  p_adj <- numeric(0)
-  signif_terms <- character(0)
-}
-
-# 5. Refit using only significant parametric terms and compare AIC
-refit_terms <- c(smooth_terms, signif_terms, large_terms)
-if (length(refit_terms) == 0) {
-  refit_form <- as.formula("prod_index ~ 1")
-} else {
-  refit_form <- as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
-}
-gam_refit <- mgcv::gam(refit_form, data = gam_df, method = "REML", select = TRUE)
-cat("AIC(original)=", AIC(gam_fit), " AIC(refit)=", AIC(gam_refit), "\n")
-
-print(summary(gam_refit)$s.table)
-print(summary(gam_refit)$p.table)
-
-par(mfrow = c(1, ncol(F_hat)))
-plot(gam_refit, pages = 1, all.terms = TRUE, shade = TRUE)
-
-# Check basis dimension adequacy
-gam.check(gam_refit)          # k-index; want > ~0.9 and p>0.05
-
-# Concurvity reduced?
-mgcv::concurvity(gam_refit)
-
-# Compare nested models formally
-anova(gam_fit, gam_refit, test="Chisq")  # uses ML; may need method="ML" refits
+gam_res  <- fit_gam(gam_df, smooth_terms, small_terms, large_terms)
+gam_fit  <- gam_res$fit
+gam_refit <- gam_diagnostics(gam_fit, gam_df, gam_res$smooth_terms, gam_res$large_terms)
 
 # Compute the raw correlation between the two factor scores
 cor(F_hat[, 1], F_hat[, 2])
