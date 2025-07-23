@@ -790,3 +790,112 @@ if (length(fac_names) > 1) {
     plot_tensor_slices(m_te, gam_df, c(f1, f2))
   }
 }
+
+# ---------------------------------------------------------------------------
+# 21. Bayesian LP-SEM with weakly informative priors
+# ---------------------------------------------------------------------------
+
+# The Bayesian structural equation model uses the final EFA indicators to
+# measure two latent factors (F1, F2).  Quadratic (F1×F1) and interaction
+# (F1×F2) terms capture curvature and joint effects.  Weak priors regularise
+# the loadings and regressions.  A small direct path from F2 to productivity
+# lets us test whether the interaction subsumes its influence.  Seedlings is
+# the only exogenous dummy retained as a direct predictor.
+
+if (!requireNamespace("blavaan", quietly = TRUE)) {
+  install.packages("blavaan", repos = "https://cloud.r-project.org")
+}
+library(blavaan)
+
+# Build measurement part from the pruned loading matrix
+meas_lines <- sapply(seq_len(ncol(Lambda0)), function(j) {
+  vars_j <- names(which(Lambda0[, j] != 0))
+  paste0("F", j, " =~ ", paste(vars_j, collapse = " + "))
+})
+
+# indicator sets for each latent variable
+f1_vars <- names(which(Lambda0[, 1] != 0))
+f2_vars <- names(which(Lambda0[, 2] != 0))
+
+# create product indicators for quadratic and interaction terms
+library(semTools)
+
+# indProd() requires numeric inputs. Convert the factor indicators used in
+# the latent factors to numeric representations before generating the
+# latent polynomial products.
+prod_base <- df_mix2_clean %>%
+  mutate(across(all_of(c(f1_vars, f2_vars)), ~ as.numeric(as.character(.))))
+
+# Use indProd() to create quadratic and interaction product indicators.
+# Explicit names ensure the lavaan model matches the data exactly and
+# avoid issues with extremely long column names.
+prod_quad <- indProd(
+  prod_base,
+  var1      = f1_vars,
+  var2      = f1_vars,
+  match     = FALSE,
+  meanC     = TRUE,
+  residualC = FALSE,
+  doubleMC  = TRUE,
+  namesProd = paste0("Quad", seq_along(f1_vars))
+)
+
+prod_int  <- indProd(
+  prod_base,
+  var1      = f1_vars,
+  var2      = f2_vars,
+  match     = FALSE,
+  meanC     = TRUE,
+  residualC = FALSE,
+  doubleMC  = TRUE,
+  namesProd = paste0("Int", seq_len(length(f1_vars) * length(f2_vars)))
+)
+
+# Assemble SEM dataset with products and outcome. Convert the retained
+# indicators to numeric so that lavaan treats them correctly.
+sem_df_base <- df_mix2_clean[, keep_final, drop = FALSE] %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+sem_df <- cbind(sem_df_base, prod_quad, prod_int)
+sem_df$prod_index <- y_prod
+
+# --- one-hot encode the seedlings question ----------------------------
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (!seed_var %in% names(df)) {
+  stop("Seedlings column not found")
+}
+seed_fac    <- factor(df[[seed_var]])
+seed_dummies <- model.matrix(~ seed_fac - 1)
+colnames(seed_dummies) <- paste0("Seedling", seq_len(ncol(seed_dummies)))
+sem_df <- cbind(sem_df, seed_dummies)
+seed_vars <- colnames(seed_dummies)
+
+quad_vars <- colnames(prod_quad)
+int_vars  <- colnames(prod_int)
+
+# Structural model with quadratic and interaction terms
+struct_lines <- c(
+  paste0("F1_sq =~ ", paste(quad_vars, collapse = " + ")),
+  paste0("F1xF2 =~ ", paste(int_vars, collapse = " + ")),
+  paste0(
+    "prod_index ~ F1 + tinyF2*F2 + F1_sq + F1xF2 + ",
+    paste(seed_vars, collapse = " + ")
+  )
+)
+
+# Combine pieces into a single model string
+bsem_model <- paste(c(meas_lines, struct_lines), collapse = "\n")
+
+# Weakly informative priors for all coefficients
+dp <- dpriors(beta = "normal(0,1)", lambda = "normal(0,1)", nu = "normal(0,1)")
+
+fit_bayes <- bsem(
+  bsem_model,
+  data   = sem_df,
+  dp     = dp,
+  burnin = 1000,
+  sample = 4000,
+  adapt  = 1000,
+  seed   = 2025
+)
+
+print(summary(fit_bayes, standardized = TRUE))
