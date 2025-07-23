@@ -789,56 +789,61 @@ meas_lines <- vapply(names(items_by_fac), function(f)
   character(1))
 
 # --- 21.2  Build full SEM specification ----------------------------------
-# Create product indicators so the latent interaction F1 × F2 can be modelled
-# (lavaan does not directly support the ":" operator for latent factors).
 df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
 df_sem$prod_index <- y_prod
 
 ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
 
-# Build product indicators via semTools (needs numeric columns)
-prod_base <- df_sem
-prod_base[ordered_vars] <- lapply(prod_base[ordered_vars], as.numeric)
-num_cols_all <- names(prod_base)[sapply(prod_base, is.numeric)]
-prod_base[num_cols_all] <- scale(prod_base[num_cols_all])
-nprod <- length(items_by_fac[["F1"]]) * length(items_by_fac[["F2"]])
-prod_names <- paste0("F1F2_", seq_len(nprod))
-df_sem <- semTools::indProd(
-  data   = prod_base,
-  var1   = items_by_fac[["F1"]],
-  var2   = items_by_fac[["F2"]],
-  match  = FALSE,
-  meanC  = TRUE,
-  namesProd = prod_names
-)
-int_indicators <- setdiff(colnames(df_sem), colnames(prod_base))
-df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
+# Reintroduce F1 curvature with a latent square term
+meas_sq_line <- "F1_sq =~ 1*F1"
 
-# Measurement model including the interaction factor
 meas_int_lines <- c(
   meas_lines,
-  paste0("F1F2 =~ ", paste(int_indicators, collapse = " + "))
+  meas_sq_line
 )
-
-# Full SEM specification with the latent interaction factor regressing prod_index
-sem_lines <- c(meas_int_lines,
-               "prod_index ~ F1 + F2 + F1F2")
-sem_model <- paste(sem_lines, collapse = "\n")
-cat("\nSEM model specification:\n", sem_model, "\n")
 
 # --- 21.3  Fit CFA model --------------------------------------------------
 fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
-                       data    = df_sem,
-                       ordered = ordered_vars,
-                       std.lv  = TRUE)
+                       data       = df_sem,
+                       ordered    = ordered_vars,
+                       std.lv     = TRUE,
+                       estimator  = "MLR",
+                       orthogonal = TRUE)
 cat("\n--- CFA summary ---\n")
 print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
 
+# Identify Heywood items and free their residual variances
+theta_hat <- diag(lavaan::inspect(fit_cfa, "theta"))
+heywood_items <- names(theta_hat)[theta_hat < 0]
+if (length(heywood_items)) {
+  cat("\nFreeing residual variances for Heywood items:\n",
+      paste(heywood_items, collapse = ", "), "\n")
+  free_lines <- paste0(heywood_items, " ~~ NA*", heywood_items)
+  meas_int_lines <- c(meas_int_lines, free_lines)
+  fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
+                         data       = df_sem,
+                         ordered    = ordered_vars,
+                         std.lv     = TRUE,
+                         estimator  = "MLR",
+                         orthogonal = TRUE)
+  cat("\n--- CFA (Heywood adjusted) summary ---\n")
+  print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
+}
+
+# Full SEM specification using LMS latent interaction
+sem_lines <- c(meas_int_lines,
+               "prod_index ~ F1 + F2 + F1_sq",
+               "prod_index ~ F1 xWITH F2")
+sem_model <- paste(sem_lines, collapse = "\n")
+cat("\nSEM model specification:\n", sem_model, "\n")
+
 # --- 21.5  Fit SEM with latent interaction -------------------------------
 fit_sem <- lavaan::sem(sem_model,
-                       data    = df_sem,
-                       ordered = ordered_vars,
-                       std.lv  = TRUE)
+                       data       = df_sem,
+                       ordered    = ordered_vars,
+                       std.lv     = TRUE,
+                       estimator  = "MLR",
+                       orthogonal = TRUE)
 cat("\n--- SEM summary ---\n")
 print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
 
