@@ -732,29 +732,41 @@ if (length(fac_names) > 1) {
   }
 }
 
-# --- draw three slices of the tensor surface --------------------
-library(mgcv)
-# pick representative F2 z-scores
-f2_grid <- c(-1, 0, 1)
+# ---- Draw three slices of tensor surfaces for all factor pairs ----
+plot_tensor_slices <- function(model, df, factors, z_grid = c(-1, 0, 1),
+                               npoints = 200) {
+  for (pair in combn(factors, 2, simplify = FALSE)) {
+    f1 <- pair[1]; f2 <- pair[2]
+    
+    # grid for predictions: f1 varies smoothly, f2 fixed at z-score levels
+    f1_seq <- seq(min(df[[f1]]), max(df[[f1]]), length.out = npoints)
+    newdat <- expand.grid(f1_seq, z_grid)
+    colnames(newdat) <- c(f1, f2)
+    
+    # obtain fitted values and standard errors from the tensor-product model
+    Xp  <- predict(model, newdat, type = "lpmatrix")
+    fit <- drop(Xp %*% coef(model))
+    se  <- sqrt(rowSums((Xp %*% vcov(model)) * Xp))
+    newdat$fit <- fit
+    newdat$se  <- se
+    
+    # plot slices
+    p <- ggplot(newdat, aes_string(f1, "fit", colour = f2)) +
+      geom_line(size = 1.1) +
+      geom_ribbon(aes_string(ymin = "fit - 2*se", ymax = "fit + 2*se", fill = f2),
+                  alpha = .2, colour = NA) +
+      scale_colour_brewer(palette = "Set1", name = paste0(f2, " (z)")) +
+      scale_fill_brewer(palette = "Set1", name = paste0(f2, " (z)")) +
+      labs(y = "Partial effect on productivity",
+           title = paste0(f1, " → productivity curves at three ", f2, " levels")) +
+      theme_minimal()
+    
+    print(p)
+  }
+}
 
-# predict across an equally-spaced F1 grid
-f1_seq  <- seq(min(gam_df$F1), max(gam_df$F1), length = 200)
-newdat  <- expand.grid(F1 = f1_seq, F2 = f2_grid)
+# Example usage:
+# Assume 'm_te' is the tensor-product model fit for the pair (f1, f2)
+plot_tensor_slices(m_te, gam_df, colnames(F_hat))
 
-Xp   <- predict(m_te, newdat, type = "lpmatrix")
-fit  <- Xp %*% coef(m_te)
-se   <- sqrt(rowSums((Xp %*% vcov(m_te)) * Xp))
 
-newdat$fit <- fit
-newdat$se  <- se
-
-library(ggplot2)
-ggplot(newdat, aes(F1, fit, colour = factor(F2))) +
-  geom_line(size = 1.1) +
-  geom_ribbon(aes(ymin = fit - 2*se, ymax = fit + 2*se, fill = factor(F2)),
-              alpha = .2, colour = NA) +
-  scale_colour_brewer(palette = "Set1", name = "F2 (z)") +
-  scale_fill_brewer(palette = "Set1", name = "F2 (z)") +
-  labs(y = "Partial effect on productivity",
-       title = "F1 → productivity curves at three F2 levels") +
-  theme_minimal()
