@@ -733,30 +733,36 @@ if (length(fac_names) > 1) {
 }
 
 # ---- Draw three slices of tensor surfaces for all factor pairs ----
-plot_tensor_slices <- function(model, df, factors, z_grid = c(-1, 0, 1),
-                               npoints = 200) {
+plot_tensor_slices <- function(model, df, factors,
+                               z_grid = c(-1, 0, 1), npoints = 200) {
+  
   for (pair in combn(factors, 2, simplify = FALSE)) {
-    f1 <- pair[1]; f2 <- pair[2]
+    f1 <- pair[1] ; f2 <- pair[2]
     
-    # grid for predictions: f1 varies smoothly, f2 fixed at z-score levels
-    f1_seq <- seq(min(df[[f1]]), max(df[[f1]]), length.out = npoints)
-    newdat <- expand.grid(f1_seq, z_grid)
+    ## 1. Grid for predictions
+    f1_seq  <- seq(min(df[[f1]]), max(df[[f1]]), length.out = npoints)
+    newdat  <- expand.grid(f1_seq, z_grid)
     colnames(newdat) <- c(f1, f2)
     
-    # obtain fitted values and standard errors from the tensor-product model
+    ## 2. Fitted values & SEs
     Xp  <- predict(model, newdat, type = "lpmatrix")
     fit <- drop(Xp %*% coef(model))
     se  <- sqrt(rowSums((Xp %*% vcov(model)) * Xp))
     newdat$fit <- fit
     newdat$se  <- se
     
-    # plot slices
+    ## 3. Cast z-levels to a factor so brewer scales work
+    newdat[[f2]] <- factor(newdat[[f2]])
+    
+    ## 4. Plot
     p <- ggplot(newdat, aes_string(f1, "fit", colour = f2)) +
       geom_line(size = 1.1) +
-      geom_ribbon(aes_string(ymin = "fit - 2*se", ymax = "fit + 2*se", fill = f2),
-                  alpha = .2, colour = NA) +
+      geom_ribbon(aes_string(ymin = "fit - 2*se",
+                             ymax = "fit + 2*se",
+                             fill  = f2),
+                  alpha = .20, colour = NA) +
       scale_colour_brewer(palette = "Set1", name = paste0(f2, " (z)")) +
-      scale_fill_brewer(palette = "Set1", name = paste0(f2, " (z)")) +
+      scale_fill_brewer(palette = "Set1",  name = paste0(f2, " (z)")) +
       labs(y = "Partial effect on productivity",
            title = paste0(f1, " → productivity curves at three ", f2, " levels")) +
       theme_minimal()
@@ -765,8 +771,22 @@ plot_tensor_slices <- function(model, df, factors, z_grid = c(-1, 0, 1),
   }
 }
 
-# Example usage:
-# Assume 'm_te' is the tensor-product model fit for the pair (f1, f2)
-plot_tensor_slices(m_te, gam_df, colnames(F_hat))
+fac_names <- colnames(F_hat)
 
-
+if (length(fac_names) > 1) {
+  pairs <- combn(fac_names, 2, simplify = FALSE)
+  
+  for (p in pairs) {
+    f1 <- p[[1]]
+    f2 <- p[[2]]
+    
+    m_te <- mgcv::gam(
+      as.formula(paste0("prod_index ~ te(", f1, ", ", f2, ")")),
+      data = gam_df,
+      method = "REML"
+    )
+    
+    # correct argument order: model, df, factors-vector
+    plot_tensor_slices(m_te, gam_df, c(f1, f2))
+  }
+}
