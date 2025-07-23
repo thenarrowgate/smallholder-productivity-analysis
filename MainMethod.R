@@ -663,12 +663,17 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
   plot(fit, residuals = TRUE)
 
   # --- Residual checks -------------------------------------------------
-  if (requireNamespace("mgcViz", quietly = TRUE)) {
+  if (requireNamespace("mgcViz", quietly = TRUE) &&
+      exists("appraise", where = asNamespace("mgcViz"), mode = "function")) {
     viz <- mgcViz::getViz(fit)
-    print(mgcViz::appraise(viz))        # QQ/scale-location
-    print(mgcViz::influence(viz))       # Cook's distance style plots
+    app_fun <- get("appraise", envir = asNamespace("mgcViz"))
+    print(app_fun(viz))        # QQ/scale-location
+    if (exists("influence", where = asNamespace("mgcViz"), mode = "function")) {
+      infl_fun <- get("influence", envir = asNamespace("mgcViz"))
+      print(infl_fun(viz))     # Cook's distance style plots
+    }
   } else {
-    cat("mgcViz not installed: using base diagnostics\n")
+    cat("mgcViz not installed or missing diagnostics: using base methods\n")
     qqnorm(resid(fit)); qqline(resid(fit))
     plot(fitted(fit), sqrt(abs(resid(fit))),
          ylab = "|residual|^0.5", xlab = "Fitted")
