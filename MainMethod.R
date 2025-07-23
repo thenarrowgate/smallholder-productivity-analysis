@@ -842,3 +842,96 @@ fit_sem <- lavaan::sem(sem_model,
 cat("\n--- SEM summary ---\n")
 print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
 
+
+# TESTING -------------------------------------------------------
+############################################################################
+# “QUADRATIC + INTERACTION” SEM — TEST SCRIPT                              #
+# - fixes non-numeric scaling, ordered-data + MLR clash, and identification #
+############################################################################
+library(lavaan)
+library(glue)
+
+## ------------------------------------------------------------------------
+## 0. Helpr: safely coerce every column to numeric (1,2,3,…) if it is a
+##          factor/ordered; leave pure numeric untouched
+## ------------------------------------------------------------------------
+as_num <- function(x) {
+  if (is.numeric(x))        return(x)
+  if (is.factor(x))         return(as.numeric(x))
+  if (is.ordered(x))        return(as.numeric(x))
+  stop("unsupported type in as_num()")
+}
+
+## ------------------------------------------------------------------------
+## 1. Build *observed* linear and quadratic F1 parcels
+## ------------------------------------------------------------------------
+v_Q70  <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+f1_inds <- c(
+  "Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous",
+  "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous",
+  "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
+  "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
+  "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+  "Q0__average_of_farming_practices__ordinal",
+  v_Q70
+)
+
+tmp_num  <- as.data.frame(lapply(df_sem[ , f1_inds, drop = FALSE], as_num))
+tmp_z    <- scale(tmp_num)                        # each indicator → z-score
+df_sem$F1_parcel   <- rowMeans(tmp_z, na.rm = TRUE)
+df_sem$F1_parcel2  <- scale(df_sem$F1_parcel^2, scale = FALSE)  # centred x²
+
+## ------------------------------------------------------------------------
+## 2. Pick the 5 strongest F1×F2 “product” indicators ---------------------
+## ------------------------------------------------------------------------
+mod_int <- '
+  F1F2 =~ F1F2_1 + F1F2_2 + F1F2_3 + F1F2_4 + F1F2_5 + F1F2_6 +
+          F1F2_7 + F1F2_8 + F1F2_9 + F1F2_10 + F1F2_11 + F1F2_12 +
+          F1F2_13 + F1F2_14 + F1F2_15 + F1F2_16 + F1F2_17 + F1F2_18 +
+          F1F2_19 + F1F2_20 + F1F2_21 + F1F2_22 + F1F2_23 + F1F2_24 +
+          F1F2_25 + F1F2_26 + F1F2_27 + F1F2_28
+'
+fit_int  <- cfa(mod_int, data = df_sem, std.lv = TRUE)
+zLoads   <- standardizedSolution(fit_int)
+loads_int <- subset(zLoads, lhs == "F1F2" & op == "=~", c(rhs, est.std))
+keepers   <- head(loads_int[order(-abs(loads_int$est.std)), "rhs"], 5)
+int_block <- paste0("F1F2 =~ ", paste(keepers, collapse = " + "))
+
+## ------------------------------------------------------------------------
+## 3. SEM specification with           – quadratic observed term
+##                                    – freed Q70 ↔ Q109 residual
+## ------------------------------------------------------------------------
+sem_quad <- glue('
+  # measurement -----------------------------------------------------------
+  F1 =~ {paste(f1_inds, collapse = " + ")}
+  F2 =~ Q5__AgeYears__continuous +
+        Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous +
+        Q0__hope_total__continuous +
+        Q0__self_control_score__continuous
+  {int_block}
+
+  # structural ------------------------------------------------------------
+  prod_index  ~  b1*F1          # linear
+  prod_index  ~  b2*F1_parcel2  # quadratic (observed)
+  prod_index  ~  b3*F2 + b4*F1F2
+
+  # allow large residual covariance between two very similar indicators
+  {v_Q70} ~~ Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous
+')
+
+cat(sem_quad)   # ↩︎ inspect if desired
+
+## ------------------------------------------------------------------------
+## 4. Fit with WLSMV (robust for ordered indicators) ----------------------
+##    – std.lv = TRUE keeps latent variances = 1 (helps identification)
+## ------------------------------------------------------------------------
+fit_quad <- sem(
+  sem_quad,
+  data      = df_sem,
+  ordered   = ordered_vars,   # keep your original vector of ordered vars
+  estimator = "WLSMV",
+  std.lv    = TRUE
+)
+
+summary(fit_quad, fit.measures = TRUE, standardized = TRUE)
+
