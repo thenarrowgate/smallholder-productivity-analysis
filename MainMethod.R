@@ -682,12 +682,19 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
 
   cv_deviance <- function(form, data, folds = 5) {
     n <- nrow(data)
-    ids <- sample(rep(1:folds, length.out = n))
+    ids <- sample(rep(seq_len(folds), length.out = n))
     dev <- numeric(folds)
+    fac_cols <- names(Filter(is.factor, data))
     for (i in seq_len(folds)) {
-      m <- mgcv::gam(form, data = data[ids != i, ], method = "REML")
-      pr <- predict(m, newdata = data[ids == i, ])
-      dev[i] <- mean((data$prod_index[ids == i] - pr)^2)
+      train <- data[ids != i, , drop = FALSE]
+      test  <- data[ids == i, , drop = FALSE]
+      for (fc in fac_cols) {
+        train[[fc]] <- factor(train[[fc]], levels = levels(data[[fc]]))
+        test[[fc]]  <- factor(test[[fc]],  levels = levels(data[[fc]]))
+      }
+      m  <- mgcv::gam(form, data = train, method = "REML")
+      pr <- predict(m, newdata = test, na.action = na.exclude)
+      dev[i] <- mean((test$prod_index - pr)^2, na.rm = TRUE)
     }
     mean(dev)
   }
