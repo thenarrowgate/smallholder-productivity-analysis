@@ -867,3 +867,41 @@ if (length(fac_names) > 1) {
     plot_tensor_slices(m_te, gam_df, c(f1, f2))
   }
 }
+
+# Grid of F1
+gr  <- seq(min(gam_df$F1), max(gam_df$F1), by = .1)
+
+# Predicted differences at F2 = +1 vs -1 (on z units)
+newdat_hi <- expand.grid(F1 = gr, F2 =  1)
+newdat_lo <- expand.grid(F1 = gr, F2 = -1)
+pred_hi   <- predict(m_int, newdat_hi, se.fit = TRUE)
+pred_lo   <- predict(m_int, newdat_lo, se.fit = TRUE)
+
+diff  <- pred_hi$fit - pred_lo$fit
+se    <- sqrt(pred_hi$se.fit^2 + pred_lo$se.fit^2)   # independent se’s
+
+# Where is the difference statistically > 0?
+sig_idx <- which(abs(diff)/se > 1.96)
+range(gr[sig_idx])
+
+q <- ecdf(gam_df$F1)
+share_hi <- 1 - q(1.17)    # proportion of farms in the ‘significant’ band
+share_hi
+
+pts <- c(0, 1, 2, 3, 4)
+new_hi <- data.frame(F1 = pts, F2 =  1)
+new_lo <- data.frame(F1 = pts, F2 = -1)
+pred_hi <- predict(m_int, new_hi, se.fit = TRUE)
+pred_lo <- predict(m_int, new_lo, se.fit = TRUE)
+
+delta <- pred_hi$fit - pred_lo$fit          # point estimate
+cil   <- delta - 1.96*sqrt(pred_hi$se.fit^2 + pred_lo$se.fit^2)
+ciu   <- delta + 1.96*sqrt(pred_hi$se.fit^2 + pred_lo$se.fit^2)
+
+cbind(F1 = pts, diff = round(delta,2), CI_lo = round(cil,2), CI_hi = round(ciu,2))
+
+
+ggplot(gam_df, aes(F1, prod_index, colour = cut(F2, c(-Inf, -0.5, 0.5, Inf)))) +
+  geom_point(alpha = .3) +
+  stat_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = FALSE) +
+  theme_classic()
