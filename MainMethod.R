@@ -1030,7 +1030,11 @@ if (length(seedling_var) > 0) {
   cat("Using mediator variable:", seedling_var, "\n")
   
   ## Use the same factor as in the GAM fit (rare levels collapsed)
-  seedlings_use <- droplevels(gam_df[[seedling_var]])
+  seedlings_use <- gam_df[[seedling_var]]
+  if (!is.factor(seedlings_use)) {
+    seedlings_use <- factor(seedlings_use)
+  }
+  seedlings_use <- droplevels(seedlings_use)
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
   if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
@@ -1071,6 +1075,10 @@ seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
 if (seed_var %in% names(gam_df)) {
   # use the same collapsed factor as in the productivity GAM
   gam_df$seedlings <- gam_df[[seed_var]]
+  if (!is.factor(gam_df$seedlings)) {
+    gam_df$seedlings <- factor(gam_df$seedlings)
+  }
+  gam_df$seedlings <- droplevels(gam_df$seedlings)
 
   message("\n=== GAM mediation test: F1 → Q56 → productivity ===")
 
