@@ -1036,15 +1036,18 @@ seedling_var <- grep("seedling", names(gam_df), ignore.case = TRUE, value = TRUE
 if (length(seedling_var) > 0) {
   seedling_var <- seedling_var[1]
   cat("Using mediator variable:", seedling_var, "\n")
-  gam_df$seedlings_use <- if (is.factor(gam_df[[seedling_var]])) {
-    as.numeric(!grepl("No", gam_df[[seedling_var]], ignore.case = TRUE))
-  } else {
-    as.numeric(gam_df[[seedling_var]])
-  }
+  
+  ## Use the same factor as in the GAM fit (rare levels collapsed)
+  seedlings_use <- gam_df[[seedling_var]]
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
+  if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
+    fam <- mgcv::multinom(K = nlevels(seedlings_use))
+  } else {
+    fam <- binomial
+  }
   m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
-             family = binomial, data = gam_df)
+             family = fam, data = gam_df)
   print(summary(m_a))
 
   ## b-path: does the seedling → productivity effect vary with F2?
