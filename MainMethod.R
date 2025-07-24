@@ -892,6 +892,7 @@ fit_bayes <- bsem(
   bsem_model,
   data   = sem_df,
   dp     = dp,
+  missing = "listwise",
   burnin = 1000,
   sample = 4000,
   adapt  = 1000,
