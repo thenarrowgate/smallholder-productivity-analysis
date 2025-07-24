@@ -1216,11 +1216,26 @@ mahal_dist <- mahalanobis(as.matrix(cfa_df[cont_vars]), colMeans(cfa_df[cont_var
 p_mahal <- pchisq(mahal_dist, df=length(cont_vars), lower.tail=FALSE)
 cfa_df$bad_case <- p_mahal < 0.001
 
-# --- 3. CFA model syntax ---
+# --- Multicollinearity check among CFA indicators ---
+cat("\n[CFA] Checking for multicollinearity among indicators (|cor| > 0.95):\n")
+cor_mat <- cor(cfa_df[sapply(cfa_df, is.numeric)], use = "pairwise.complete.obs")
+high_corrs <- which(abs(cor_mat) > 0.95 & abs(cor_mat) < 1, arr.ind = TRUE)
+if (length(high_corrs) > 0) {
+  for (i in seq_len(nrow(high_corrs))) {
+    v1 <- rownames(cor_mat)[high_corrs[i, 1]]
+    v2 <- colnames(cor_mat)[high_corrs[i, 2]]
+    cat(sprintf("%s and %s: %.3f\n", v1, v2, cor_mat[high_corrs[i, 1], high_corrs[i, 2]]))
+  }
+} else {
+  cat("No pairs with |cor| > 0.95 found.\n")
+}
+
+# --- 3. CFA model syntax (with cross-loadings and correlated error) ---
 cfa_model <- '
-  F1 =~ q62_veg_harvest + inc_agri + farm_self_eval + ext_info_12m + land_cultivated + land_veg
-  F2 =~ inc_total + hope + self_control + age + farm_practice_mean
+  F1 =~ q62_veg_harvest + inc_agri + farm_self_eval + ext_info_12m + land_cultivated + land_veg + farm_practice_mean
+  F2 =~ inc_total + hope + self_control + age + farm_practice_mean + ext_info_12m
   F1 ~~ F2
+  ext_info_12m ~~ inc_agri
 '
 
 # --- 4. Estimation settings ---
