@@ -871,6 +871,9 @@ if (length(fac_names) > 1) {
 # Grid of F1
 gr  <- seq(min(gam_df$F1), max(gam_df$F1), by = .1)
 
+m_int <- gam(prod_index ~ te(F1, F2, bs=c("tp","tp"), k=c(9,9)),
+             data=gam_df, method="REML")
+
 # Predicted differences at F2 = +1 vs -1 (on z units)
 newdat_hi <- expand.grid(F1 = gr, F2 =  1)
 newdat_lo <- expand.grid(F1 = gr, F2 = -1)
