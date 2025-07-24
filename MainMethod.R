@@ -1171,20 +1171,19 @@ library(semTools)   # reliability()
 library(blavaan)    # bcfa()
 
 # --- 1. Data block: select 11 indicators with |loading| >= 0.30 ---
-# (Update these names if EFA output changes)
-# Example mapping: adjust to match your EFA output
+# Updated mapping to match actual column names in df_mix2_clean
 indicator_map <- c(
-  q62_veg_harvest    = "Q62__How_much_of_your_vegetable_harvest_is_consumed_by_your_household__continuous",
-  inc_agri           = "Q0__INCOME_AGRI__continuous",
-  farm_self_eval     = "Q60__How_do_you_evaluate_your_farm_performance__ordinal",
-  ext_info_12m       = "Q54__Did_you_receive_extension_information_in_last_12_months__binary",
-  land_cultivated    = "Q2__LAND_CULTIVATED__continuous",
-  land_veg           = "Q3__LAND_VEG__continuous",
-  inc_total          = "Q0__INCOME_TOTAL__continuous",
-  hope               = "Q70__HOPE__continuous",
-  self_control       = "Q71__SELF_CONTROL__continuous",
-  age                = "Q1__AGE__continuous",
-  farm_practice_mean = "Q61__How_do_you_evaluate_your_farm_practices__ordinal"
+  q62_veg_harvest    = "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
+  inc_agri           = "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
+  farm_self_eval     = "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+  ext_info_12m       = "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1",
+  land_cultivated    = "Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous",
+  land_veg           = "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous",
+  inc_total          = "Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous",
+  hope               = "Q0__hope_total__continuous",
+  self_control       = "Q0__self_control_score__continuous",
+  age                = "Q5__AgeYears__continuous",
+  farm_practice_mean = "Q0__average_of_farming_practices__ordinal"
 )
 
 # Subset and rename
@@ -1230,12 +1229,76 @@ if (length(high_corrs) > 0) {
   cat("No pairs with |cor| > 0.95 found.\n")
 }
 
-# --- 3. CFA model syntax (with cross-loadings and correlated error) ---
+# --- Diagnostic: Check for unexpected collinearity between ext_info_12m and inc_agri ---
+cat("\n[CFA] Checking for collinearity between ext_info_12m and inc_agri:\n")
+if ("ext_info_12m" %in% names(cfa_df) && "inc_agri" %in% names(cfa_df)) {
+  # Print correlation
+  cor_val <- suppressWarnings(cor(as.numeric(cfa_df$ext_info_12m), as.numeric(cfa_df$inc_agri), use = "pairwise.complete.obs"))
+  cat(sprintf("Correlation (numeric): %.3f\n", cor_val))
+  # Print unique values
+  cat("Unique values in ext_info_12m:\n"); print(unique(cfa_df$ext_info_12m))
+  cat("Unique values in inc_agri:\n"); print(unique(cfa_df$inc_agri))
+  # Print cross-tabulation
+  cat("Cross-tabulation (ext_info_12m vs inc_agri):\n")
+  print(table(ext_info_12m = cfa_df$ext_info_12m, inc_agri = round(cfa_df$inc_agri, 2)))
+}
+
+# 6A. Print distribution of ext_info_12m
+cat("\n[CFA] Distribution of ext_info_12m:\n")
+print(table(cfa_df$ext_info_12m))
+
+# 6B. CFA with only continuous variables
+cont_only_vars <- c("q62_veg_harvest", "inc_agri", "land_cultivated", "land_veg", "inc_total", "hope", "self_control", "age")
+cat("\n[CFA] Fitting CFA with only continuous variables:\n")
+cont_cfa_model <- paste0(
+  "F1 =~ ", paste(cont_only_vars[1:4], collapse = " + "), "\n",
+  "F2 =~ ", paste(cont_only_vars[5:8], collapse = " + "), "\nF1 ~~ F2"
+)
+fit_cfa_cont <- tryCatch({
+  lavaan::cfa(
+    cont_cfa_model,
+    data = cfa_df,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    missing = "pairwise"
+  )
+}, error = function(e) {
+  cat("\n[CFA ERROR] CFA with only continuous variables failed:\n")
+  print(e)
+  return(NULL)
+})
+if (!is.null(fit_cfa_cont)) {
+  fit_indices_cont <- lavaan::fitMeasures(fit_cfa_cont, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  cat("Fit indices (continuous only):\n"); print(fit_indices_cont)
+}
+
+# 6D. Fit main CFA model with robust ML estimator
+cat("\n[CFA] Fitting main CFA model with estimator = 'MLR':\n")
+fit_cfa_mlr <- tryCatch({
+  lavaan::cfa(
+    cfa_model,
+    data = cfa_df,
+    std.lv = TRUE,
+    estimator = "MLR",
+    ordered = ordered_items,
+    missing = "pairwise"
+  )
+}, error = function(e) {
+  cat("\n[CFA ERROR] CFA with estimator = 'MLR' failed:\n")
+  print(e)
+  return(NULL)
+})
+if (!is.null(fit_cfa_mlr)) {
+  fit_indices_mlr <- lavaan::fitMeasures(fit_cfa_mlr, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  cat("Fit indices (MLR):\n"); print(fit_indices_mlr)
+}
+
+# --- 3. CFA model syntax (assign ext_info_12m and farm_practice_mean to one factor each, matching EFA) ---
+# ext_info_12m assigned to F1, farm_practice_mean assigned to F2 (adjust if EFA suggests otherwise)
 cfa_model <- '
-  F1 =~ q62_veg_harvest + inc_agri + farm_self_eval + ext_info_12m + land_cultivated + land_veg + farm_practice_mean
-  F2 =~ inc_total + hope + self_control + age + farm_practice_mean + ext_info_12m
+  F1 =~ q62_veg_harvest + farm_self_eval + ext_info_12m + land_cultivated + land_veg
+  F2 =~ inc_total + hope + self_control + age + farm_practice_mean + inc_agri
   F1 ~~ F2
-  ext_info_12m ~~ inc_agri
 '
 
 # --- 4. Estimation settings ---
