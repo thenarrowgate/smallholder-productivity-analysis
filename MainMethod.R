@@ -15,6 +15,7 @@ library(boot)        # bootstrap()
 library(Gifi)        # princals()
 library(lavaan)      # sem()
 library(mgcv)        # gam()
+library(mgcViz)      # diagnostic tools for mgcv::gam
 library(polycor)     # hetcor()
 library(psych)       # mixedCor(), fa.*, factor.congruence(), factor.scores
 library(readxl)      # read_excel()
@@ -26,6 +27,7 @@ library(reshape2)    # melt()
 library(tidyr)       # pivot_longer()
 library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
+library(mediation)   # causal mediation analysis
 
 # Step 2 ─ Set seed and working directory
 # Resolve where the script is running from so relative paths work both when
@@ -55,8 +57,8 @@ setwd(LOCAL_DIR)
 # predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
-df     <- df %>% select(-Q0__AGR_PROD__continuous,
-                        -Q0__sustainable_livelihood_score__continuous)
+df     <- df %>% dplyr::select(-Q0__AGR_PROD__continuous,
+-Q0__sustainable_livelihood_score__continuous)
 
 # Step 4 ─ Split variables by declared type
 # Variable names encode their measurement level after the final "__".
@@ -647,7 +649,8 @@ gam_df <- na.omit(gam_df)
 fit_gam <- function(df, smooth_terms, small_terms, large_terms) {
   all_terms <- c(smooth_terms, small_terms, large_terms)
   form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
-  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE)
+  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE,
+                    drop.unused.levels = FALSE)
   print(summary(fit)$s.table)
   print(summary(fit)$p.table)
   par(mfrow = c(1, ncol(F_hat)))
@@ -660,6 +663,46 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
   print(mgcv::concurvity(fit))
   par(mfrow = c(1, 1))
   plot(fit, residuals = TRUE)
+
+  # --- Residual checks -------------------------------------------------
+  if (requireNamespace("mgcViz", quietly = TRUE) &&
+      exists("appraise", where = asNamespace("mgcViz"), mode = "function")) {
+    viz <- mgcViz::getViz(fit)
+    app_fun <- get("appraise", envir = asNamespace("mgcViz"))
+    print(app_fun(viz))        # QQ/scale-location
+    if (exists("influence", where = asNamespace("mgcViz"), mode = "function")) {
+      infl_fun <- get("influence", envir = asNamespace("mgcViz"))
+      print(infl_fun(viz))     # Cook's distance style plots
+    }
+  } else {
+    cat("mgcViz not installed or missing diagnostics: using base methods\n")
+    qqnorm(resid(fit)); qqline(resid(fit))
+    plot(fitted(fit), sqrt(abs(resid(fit))),
+         ylab = "|residual|^0.5", xlab = "Fitted")
+  }
+  acf(resid(fit), main = "ACF of GAM residuals")
+
+  cv_deviance <- function(form, data, folds = 5) {
+    n <- nrow(data)
+    ids <- sample(rep(seq_len(folds), length.out = n))
+    dev <- numeric(folds)
+    fac_cols <- names(Filter(is.factor, data))
+    for (i in seq_len(folds)) {
+      train <- data[ids != i, , drop = FALSE]
+      test  <- data[ids == i, , drop = FALSE]
+      for (fc in fac_cols) {
+        train[[fc]] <- factor(train[[fc]], levels = levels(data[[fc]]))
+        test[[fc]]  <- factor(test[[fc]],  levels = levels(data[[fc]]))
+      }
+      m <- mgcv::gam(form, data = data[ids != i, ], method = "REML",
+                     drop.unused.levels = FALSE)
+      pr <- predict(m, newdata = test, na.action = na.exclude)
+      dev[i] <- mean((test$prod_index - pr)^2, na.rm = TRUE)
+    }
+    mean(dev)
+  }
+  cv_dev <- cv_deviance(formula(fit), df)
+  cat("5-fold CV MSE:", signif(cv_dev, 3), "\n")
 
   param_terms <- summary(fit)$pTerms.table
   if (!is.null(param_terms) && nrow(param_terms) > 0) {
@@ -677,13 +720,44 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
     as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
   }
 
-  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE)
+  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE,
+                     drop.unused.levels = FALSE)
   cat("AIC(original)=", AIC(fit), " AIC(refit)=", AIC(refit), "\n")
   print(summary(refit)$s.table)
   print(summary(refit)$p.table)
   par(mfrow = c(1, ncol(F_hat)))
   plot(refit, pages = 1, all.terms = TRUE, shade = TRUE)
-  gam.check(refit)                    # k-index; want > ~0.9 and p>0.05
+  chk <- mgcv::gam.check(refit)   # k-index; want > ~0.9 and p>0.05
+  print(chk)
+  low_k <- chk$k.check[, "k-index"] < 0.9
+  if (any(low_k)) {
+    bad <- rownames(chk$k.check)[low_k]
+    cat("Low k-index for:", paste(bad, collapse = ", "), "\n")
+
+    hi_terms <- smooth_terms
+    for (nm in bad) {
+      idx <- match(nm, smooth_terms)
+      if (!is.na(idx)) {
+        k_old <- refit$smooth[[idx]]$bs.dim
+        hi_terms[idx] <- sub(")$",
+                             paste0(", k=", k_old * 2, ")"),
+                             hi_terms[idx])
+      }
+    }
+
+    hi_form <- as.formula(paste("prod_index ~", paste(c(hi_terms, signif_terms, large_terms), collapse = " + ")))
+    refit_hi <- mgcv::gam(hi_form, data = df, method = "REML", select = TRUE,
+                          drop.unused.levels = FALSE)
+    cat("AIC(high-k)=", AIC(refit_hi), "\n")
+    anova(refit, refit_hi, test = "Chisq")
+  }
+  alt_terms <- gsub("s\\(([^)]+)\\)", "s(\\1, bs='cs')", smooth_terms)
+  alt_form <- as.formula(paste("prod_index ~", paste(c(alt_terms, signif_terms, large_terms), collapse = " + ")))
+  gam_alt <- mgcv::gam(alt_form, data = df, method = "REML", select = TRUE,
+                       drop.unused.levels = FALSE)
+  cat("AIC(cs basis)=", AIC(gam_alt), "\n")
+  anova(refit, gam_alt, test = "Chisq")
+
   mgcv::concurvity(refit)
   anova(fit, refit, test = "Chisq")   # uses ML; may need method="ML" refits
   refit
@@ -707,7 +781,8 @@ print(cor(F_hat))
 # 2. Univariate smooths for each factor
 for (f in colnames(F_hat)) {
   form <- as.formula(paste("prod_index ~ s(", f, ")"))
-  m_single <- mgcv::gam(form, data = gam_df, method = "REML")
+  m_single <- mgcv::gam(form, data = gam_df, method = "REML",
+                        drop.unused.levels = FALSE)
   cat("\n--- Smooth effect for", f, "---\n")
   print(summary(m_single))
   plot(m_single, shade = TRUE)
@@ -722,8 +797,10 @@ if (length(fac_names) > 1) {
     f1 <- p[1]; f2 <- p[2]
     form_te  <- as.formula(paste("prod_index ~ te(", f1, ", ", f2, ")"))
     form_add <- as.formula(paste("prod_index ~ s(", f1, ") + s(", f2, ")"))
-    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML")
-    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML")
+    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML",
+                      drop.unused.levels = FALSE)
+    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML",
+                       drop.unused.levels = FALSE)
     cat("\n--- Tensor interaction model (", f1, " × ", f2, ") ---\n")
     print(summary(m_te))
     vis.gam(m_te, view = c(f1, f2), plot.type = "persp",
@@ -771,22 +848,247 @@ plot_tensor_slices <- function(model, df, factors,
   }
 }
 
+# ---- Diagnostics for the F1 × F2 interaction -------------------------
+diagnose_F1_F2 <- function(df) {
+  int_mod <- gam(prod_index ~ te(F1, F2, k = c(9, 9)),
+                 data   = df,
+                 method = "REML")
+
+  # ---- Differences between high and low F2 at a grid of F1 values ----
+  gr <- seq(min(df$F1), max(df$F1), by = 0.1)
+  hi_dat <- data.frame(F1 = gr, F2 = 1)
+  lo_dat <- data.frame(F1 = gr, F2 = -1)
+  pr_hi  <- predict(int_mod, hi_dat, se.fit = TRUE)
+  pr_lo  <- predict(int_mod, lo_dat, se.fit = TRUE)
+
+  diff <- pr_hi$fit - pr_lo$fit
+  se   <- sqrt(pr_hi$se.fit^2 + pr_lo$se.fit^2)
+  sig_idx <- which(abs(diff)/se > 1.96)
+  cat("Significant F1 range:", range(gr[sig_idx]), "\n")
+
+  q <- ecdf(df$F1)
+  cat("Share in significant band:", 1 - q(1.17), "\n")
+
+  pts    <- 0:4
+  hi_pts <- data.frame(F1 = pts, F2 = 1)
+  lo_pts <- data.frame(F1 = pts, F2 = -1)
+  pr_hi2 <- predict(int_mod, hi_pts, se.fit = TRUE)
+  pr_lo2 <- predict(int_mod, lo_pts, se.fit = TRUE)
+
+  delta <- pr_hi2$fit - pr_lo2$fit
+  cil   <- delta - 1.96 * sqrt(pr_hi2$se.fit^2 + pr_lo2$se.fit^2)
+  ciu   <- delta + 1.96 * sqrt(pr_hi2$se.fit^2 + pr_lo2$se.fit^2)
+  print(cbind(F1 = pts, diff = round(delta, 2),
+              CI_lo = round(cil, 2), CI_hi = round(ciu, 2)))
+
+  p1 <- ggplot(df, aes(F1, prod_index,
+                 colour = cut(F2, c(-Inf, -0.5, 0.5, Inf)))) +
+    geom_point(alpha = 0.3) +
+    stat_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = FALSE) +
+    theme_classic()
+  print(p1)
+
+  # ---- Robustness check: trim extreme productivity value -------------
+  thr      <- max(df$prod_index, na.rm = TRUE)
+  df_trim  <- filter(df, prod_index < thr)
+  int_trim <- gam(prod_index ~ te(F1, F2, k = c(9, 9)),
+                  data   = df_trim,
+                  method = "REML")
+
+  simple_slope <- function(model, F1_pts = 0:4,
+                           F2_hi = 1, F2_lo = -1) {
+    hi <- data.frame(F1 = F1_pts, F2 = F2_hi)
+    lo <- data.frame(F1 = F1_pts, F2 = F2_lo)
+
+    pr_hi <- predict(model, hi, se.fit = TRUE)
+    pr_lo <- predict(model, lo, se.fit = TRUE)
+
+    delta <- pr_hi$fit - pr_lo$fit
+    se    <- sqrt(pr_hi$se.fit^2 + pr_lo$se.fit^2)
+    ci_lo <- delta - 1.96 * se
+    ci_hi <- delta + 1.96 * se
+
+    tibble(F1 = F1_pts, diff = delta, CI_lo = ci_lo, CI_hi = ci_hi)
+  }
+
+  tbl_orig <- simple_slope(int_mod)
+  tbl_trim <- simple_slope(int_trim)
+  comparison <- left_join(tbl_orig  %>% rename_with(~paste0(.x, "_orig"), -F1),
+                          tbl_trim %>% rename_with(~paste0(.x, "_trim"), -F1),
+                          by = "F1") |>
+    mutate(delta_change = diff_trim - diff_orig)
+  print(comparison)
+
+  # ---- Alternative centring: F2 quartiles ----------------------------
+  df_q <- df %>%
+    mutate(F2_q = cut(F2,
+                      breaks = quantile(F2, probs = seq(0, 1, 0.25),
+                                        na.rm = TRUE),
+                      include.lowest = TRUE,
+                      labels = c("Q1", "Q2", "Q3", "Q4")))
+
+  m_by_q <- gam(prod_index ~ s(F1, by = F2_q, k = 9) + F2_q,
+                data   = df_q,
+                method = "REML",
+                drop.unused.levels = FALSE)
+  print(summary(m_by_q))
+  plot(m_by_q, pages = 1, shade = TRUE, seWithMean = TRUE)
+
+  band_breaks <- c(1.17, 2, 3, 4, 5, max(df_q$F1))
+  band_labels <- c("1.17–2", "2–3", "3–4", "4–5", "5+")
+  df_q <- df_q %>%
+    mutate(F1_band = cut(F1, breaks = band_breaks, right = FALSE,
+                         labels = band_labels))
+
+  band_centers <- tibble(
+    F1_band = band_labels,
+    x_pos   = (head(band_breaks, -1) + tail(band_breaks, -1)) / 2
+  )
+
+  band_counts <- df_q %>%
+    filter(!is.na(F1_band)) %>%
+    count(F1_band) %>%
+    left_join(band_centers, by = "F1_band") %>%
+    mutate(y_pos = Inf)
+
+  p2 <- ggplot(df_q, aes(F1, prod_index, colour = F2_q)) +
+    geom_point(alpha = 0.25) +
+    geom_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = TRUE) +
+    geom_rug(alpha = 0.3) +
+    geom_text(
+      data        = band_counts,
+      aes(x = x_pos, y = y_pos, label = n),
+      vjust       = 1.2,
+      size        = 3.2,
+      inherit.aes = FALSE
+    ) +
+    scale_colour_brewer(palette = "Dark2", name = "F2 quartile") +
+    labs(
+      title    = "F1 → Productivity curves by F2 quartile",
+      subtitle = "Numbers indicate sample size in each high-F1 band",
+      x        = "F1 (z-score)",
+      y        = "Partial effect on productivity"
+    ) +
+    coord_cartesian(clip = "off") +
+    theme_classic()
+  print(p2)
+
+  invisible(list(p1 = p1, p2 = p2))
+}
+
 fac_names <- colnames(F_hat)
 
 if (length(fac_names) > 1) {
   pairs <- combn(fac_names, 2, simplify = FALSE)
-  
+
   for (p in pairs) {
     f1 <- p[[1]]
     f2 <- p[[2]]
-    
+
     m_te <- mgcv::gam(
       as.formula(paste0("prod_index ~ te(", f1, ", ", f2, ")")),
       data = gam_df,
-      method = "REML"
+      method = "REML",
+      drop.unused.levels = FALSE
     )
-    
+
     # correct argument order: model, df, factors-vector
     plot_tensor_slices(m_te, gam_df, c(f1, f2))
+
+    if (f1 == "F1" && f2 == "F2") {
+      diagnose_F1_F2(gam_df)
+    }
   }
 }
+
+# ---------------------------------------------------------------------
+# 20.4  Mediation test: does F2 act through F1? -------------------------
+# ---------------------------------------------------------------------
+# Theory: household capacity (F2) may boost productivity indirectly by
+# enabling additional F1 investment.  We fit a GAM of F1 on F2 as the
+# mediator model and a GAM of productivity on both F1 and F2 as the
+# outcome model.  The `mediation` package estimates the indirect
+# effect via simulated draws from these fits.
+
+med_model  <- gam(F1 ~ s(F2), data = gam_df, method = "REML")
+out_model  <- gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
+
+med_result <- mediate(med_model, out_model,
+                      treat    = "F2",
+                      mediator = "F1",
+                      sims     = 100,
+                      boot     = TRUE)
+
+print(summary(med_result))
+
+## ---------------------------------------------------------------------
+## 3.  Moderated mediation: F1 → seedlings → productivity with F2 moderator
+## ---------------------------------------------------------------------
+seedling_var <- grep("seedling", names(gam_df), ignore.case = TRUE, value = TRUE)
+if (length(seedling_var) > 0) {
+  seedling_var <- seedling_var[1]
+  cat("Using mediator variable:", seedling_var, "\n")
+  
+  ## Use the same factor as in the GAM fit (rare levels collapsed)
+  seedlings_use <- droplevels(gam_df[[seedling_var]])
+
+  ## a-path: does F1 predict seedling use and does that depend on F2?
+  if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
+    K <- nlevels(seedlings_use) - 1
+    y <- as.numeric(seedlings_use) - 1
+    form_list <- vector("list", K)
+    form_list[[1]] <-
+      as.formula("y ~ s(F1) + s(F2) + ti(F1, F2)")
+    for (j in 2:K) {
+      form_list[[j]] <- as.formula("~ s(F1) + s(F2) + ti(F1, F2)")
+    }
+    m_a <- gam(form_list, family = mgcv::multinom(K = K),
+               data = transform(gam_df, y = y))
+  } else {
+    m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
+               family = binomial, data = gam_df)
+  }
+  print(summary(m_a))
+  print(m_a)
+
+  ## b-path: does the seedling → productivity effect vary with F2?
+  m_b <- gam(prod_index ~ s(F1) + s(F2) + seedlings_use + seedlings_use:F2,
+             data = gam_df, method = "REML")
+  print(m_b)
+  print(summary(m_b))
+  anova(m_b, test = "Chisq")
+} else {
+  cat("No seedlings variable found for moderated mediation test\n")
+}
+
+# ---------------------------------------------------------------------------
+# 22. Mediation check: Do agronomic practices explain part of the
+#     F1 → productivity effect?
+# ---------------------------------------------------------------------------
+# Theory: On-farm capital (F1) raises the probability of using
+# self-prepared seedlings (Q56), which then boosts productivity.
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (seed_var %in% names(gam_df)) {
+  # use the same collapsed factor as in the productivity GAM
+  gam_df$seedlings <- gam_df[[seed_var]]
+
+  message("\n=== GAM mediation test: F1 → Q56 → productivity ===")
+
+  # a) does F1 predict the seedling practice categories?
+  seed_num <- as.numeric(gam_df$seedlings) - 1
+  K <- nlevels(gam_df$seedlings) - 1
+  flist <- c(list(seed_num ~ s(F1)), rep(list(~s(F1)), K - 1))
+  gam_seed <- mgcv::gam(flist, data = data.frame(gam_df, seed_num),
+                        family = mgcv::multinom(K = K), method = "REML")
+  print(summary(gam_seed))
+
+  # b) effect of F1 on productivity controlling for Q56
+  gam_base <- mgcv::gam(prod_index ~ s(F1), data = gam_df, method = "REML")
+  gam_med  <- mgcv::gam(prod_index ~ s(F1) + seedlings, data = gam_df,
+                        method = "REML")
+  cat("ΔAIC =", AIC(gam_base) - AIC(gam_med), "\n")
+  print(summary(gam_med))
+} else {
+  message("Q56 variable not found; skipping mediation check")
+}
+

@@ -7,6 +7,7 @@ This repository analyzes smallholder farming data from **Nepal** and **Senegal**
 - **Preprocessing:** The notebook `EDA.ipynb` performs exploratory analysis and handles missing values and outliers. It saves processed datasets as `nepal_dataframe_FA.xlsx` and `senegal_dataframe_FA.xlsx`.
 - **Factor analysis:** `MainMethod.R` splits variables by type, builds mixed correlation matrices and uses bootstrapped exploratory factor analysis (EFA) to obtain stable loadings. Further steps (e.g., CFA/SEM) examine how well latent factors explain the productivity index.
 Before EFA, the script now checks variable suitability using the KMO and Bartlett tests. The correlation matrix is adjusted to be positive definite using nearPD before these tests.
+- **GAM diagnostics:** After fitting productivity GAMs, the script runs residual normality and heteroscedasticity checks, influential point diagnostics, residual autocorrelation, 5‑fold cross-validation of deviance and reviews the k-index to potentially refit with higher basis dimensions or alternative smooths. During cross‑validation, factor levels are preserved to avoid prediction errors.
 ## Environment Setup
 1. **Python requirements**
    ```bash
