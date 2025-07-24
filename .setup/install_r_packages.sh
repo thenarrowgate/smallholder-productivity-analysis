@@ -4,6 +4,6 @@
 set -e
 
 Rscript - <<'RSCRIPT'
-packages <- c("EFAtools", "Gifi")
+packages <- c("EFAtools", "Gifi", "mgcViz", "mediation")
 install.packages(packages, repos = "https://cloud.r-project.org")
 RSCRIPT
