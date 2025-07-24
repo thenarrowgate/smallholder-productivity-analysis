@@ -588,6 +588,57 @@ ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
   )
 
 # ---------------------------------------------------------------------------
+# 20a. Pre-CFA diagnostic checks
+# ---------------------------------------------------------------------------
+# These checks evaluate the pruned factor structure before moving on to a
+# confirmatory factor analysis. They summarise reliability, distributional
+# properties and indicator counts.
+
+# --- 20a.1 Reliability (Cronbach's alpha) per factor -----------------------
+assign_fac <- apply(abs(Lambda0), 1, which.max)
+for (j in seq_len(ncol(Lambda0))) {
+  inds <- names(assign_fac)[assign_fac == j & abs(Lambda0[, j]) >= 0.3]
+  if (length(inds) >= 2) {
+    alpha_j <- tryCatch(psych::alpha(df_mix2_clean[, inds, drop = FALSE])$total$raw_alpha,
+                        error = function(e) NA_real_)
+    cat(sprintf("Factor %s Cronbach alpha: %.3f\n", colnames(Lambda0)[j], alpha_j))
+  } else {
+    cat(sprintf("Factor %s has fewer than two strong indicators; alpha not computed\n",
+                colnames(Lambda0)[j]))
+  }
+}
+
+# --- 20a.2 Normality & outlier screening ----------------------------------
+norm_p <- sapply(df_mix2_clean[, keep_final, drop = FALSE], function(v) {
+  if (is.numeric(v) && length(na.omit(unique(v))) > 3) {
+    tryCatch(shapiro.test(v)$p.value, error = function(e) NA_real_)
+  } else {
+    NA_real_
+  }
+})
+cat("Shapiro-Wilk normality p-values:\n")
+print(round(norm_p, 3))
+if (any(norm_p < 0.05, na.rm = TRUE)) {
+  cat("Normality questionable for some items; robust estimators advised.\n")
+}
+
+out_counts <- sapply(df_mix2_clean[, keep_final, drop = FALSE], function(v) {
+  if (is.numeric(v)) sum(abs(scale(v)) > 3, na.rm = TRUE) else 0
+})
+cat("Outlier counts per item (|z|>3):\n")
+print(out_counts)
+
+# --- 20a.3 Indicator count per factor -------------------------------------
+ind_counts <- sapply(seq_len(ncol(Lambda0)), function(j)
+  sum(abs(Lambda0[, j]) >= 0.3))
+names(ind_counts) <- colnames(Lambda0)
+cat("Indicators with |loading|>=0.30 per factor:\n")
+print(ind_counts)
+if (any(ind_counts < 3)) {
+  cat("Warning: some factors have fewer than three well-defined indicators.\n")
+}
+
+# ---------------------------------------------------------------------------
 # 20. Factor scores and GAM regression
 # ---------------------------------------------------------------------------
 # After pruning we compute Ten Berge factor scores for the retained variables
@@ -626,6 +677,14 @@ F_hat <- X_std %*% W_B
 # 6.  Keep the same labels so downstream code is unchanged
 colnames(F_hat) <- colnames(Lambda0)   # “F1”, “F2”, …
 rownames(F_hat) <- rownames(df_mix2_clean)
+
+# --- 20a.4 Review factor correlations -------------------------------------
+fac_cor <- cor(F_hat)
+cat("Factor score correlations:\n")
+print(round(fac_cor, 3))
+if (any(abs(fac_cor[lower.tri(fac_cor)]) > 0.85)) {
+  cat("Warning: high correlations between factors detected.\n")
+}
 
 # --- 20.2  Prepare nominal predictors --------------------------------------
 collapse_rare <- function(f, threshold = 0.05) {
