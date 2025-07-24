@@ -1061,3 +1061,34 @@ if (length(seedling_var) > 0) {
   cat("No seedlings variable found for moderated mediation test\n")
 }
 
+# ---------------------------------------------------------------------------
+# 22. Mediation check: Do agronomic practices explain part of the
+#     F1 → productivity effect?
+# ---------------------------------------------------------------------------
+# Theory: On-farm capital (F1) raises the probability of using
+# self-prepared seedlings (Q56), which then boosts productivity.
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (seed_var %in% names(gam_df)) {
+  # use the same collapsed factor as in the productivity GAM
+  gam_df$seedlings <- gam_df[[seed_var]]
+
+  message("\n=== GAM mediation test: F1 → Q56 → productivity ===")
+
+  # a) does F1 predict the seedling practice categories?
+  seed_num <- as.numeric(gam_df$seedlings) - 1
+  K <- nlevels(gam_df$seedlings) - 1
+  flist <- c(list(seed_num ~ s(F1)), rep(list(~s(F1)), K - 1))
+  gam_seed <- mgcv::gam(flist, data = data.frame(gam_df, seed_num),
+                        family = mgcv::multinom(K = K), method = "REML")
+  print(summary(gam_seed))
+
+  # b) effect of F1 on productivity controlling for Q56
+  gam_base <- mgcv::gam(prod_index ~ s(F1), data = gam_df, method = "REML")
+  gam_med  <- mgcv::gam(prod_index ~ s(F1) + seedlings, data = gam_df,
+                        method = "REML")
+  cat("ΔAIC =", AIC(gam_base) - AIC(gam_med), "\n")
+  print(summary(gam_med))
+} else {
+  message("Q56 variable not found; skipping mediation check")
+}
+
