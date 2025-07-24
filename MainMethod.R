@@ -56,7 +56,7 @@ setwd(LOCAL_DIR)
 # predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
-df     <- df %>% select(-Q0__AGR_PROD__continuous,
+df     <- df %>% dplyr::select(-Q0__AGR_PROD__continuous,
                         -Q0__sustainable_livelihood_score__continuous)
 
 # Step 4 ─ Split variables by declared type
