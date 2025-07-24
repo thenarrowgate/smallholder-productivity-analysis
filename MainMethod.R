@@ -1162,3 +1162,153 @@ if (seed_var %in% names(gam_df)) {
   message("Q56 variable not found; skipping mediation check")
 }
 
+
+# ---------------------------------------------------------------------------
+# 21. Robust Confirmatory Factor Analysis (CFA)
+# ---------------------------------------------------------------------------
+# Load additional packages for CFA and reliability
+library(semTools)   # reliability()
+library(blavaan)    # bcfa()
+
+# --- 1. Data block: select 11 indicators with |loading| >= 0.30 ---
+# (Update these names if EFA output changes)
+# Example mapping: adjust to match your EFA output
+indicator_map <- c(
+  q62_veg_harvest    = "Q62__How_much_of_your_vegetable_harvest_is_consumed_by_your_household__continuous",
+  inc_agri           = "Q0__INCOME_AGRI__continuous",
+  farm_self_eval     = "Q60__How_do_you_evaluate_your_farm_performance__ordinal",
+  ext_info_12m       = "Q54__Did_you_receive_extension_information_in_last_12_months__binary",
+  land_cultivated    = "Q2__LAND_CULTIVATED__continuous",
+  land_veg           = "Q3__LAND_VEG__continuous",
+  inc_total          = "Q0__INCOME_TOTAL__continuous",
+  hope               = "Q70__HOPE__continuous",
+  self_control       = "Q71__SELF_CONTROL__continuous",
+  age                = "Q1__AGE__continuous",
+  farm_practice_mean = "Q61__How_do_you_evaluate_your_farm_practices__ordinal"
+)
+
+# Subset and rename
+cfa_df <- df_mix2_clean[, indicator_map]
+names(cfa_df) <- names(indicator_map)
+
+# --- 2. Pre-processing ---
+# Z-score continuous indicators
+cont_vars <- c("q62_veg_harvest", "inc_agri", "land_cultivated", "land_veg", "inc_total", "hope", "self_control", "age")
+cfa_df[cont_vars] <- scale(cfa_df[cont_vars])
+
+# Declare ordered factors
+cfa_df$farm_self_eval     <- ordered(cfa_df$farm_self_eval, levels = sort(unique(cfa_df$farm_self_eval)))
+cfa_df$farm_practice_mean <- ordered(cfa_df$farm_practice_mean, levels = sort(unique(cfa_df$farm_practice_mean)))
+cfa_df$ext_info_12m      <- ordered(cfa_df$ext_info_12m, levels = sort(unique(cfa_df$ext_info_12m)))
+
+# Mahalanobis distance for outlier detection
+mahal_dist <- mahalanobis(as.matrix(cfa_df[cont_vars]), colMeans(cfa_df[cont_vars], na.rm=TRUE), cov(cfa_df[cont_vars], use="pairwise"))
+p_mahal <- pchisq(mahal_dist, df=length(cont_vars), lower.tail=FALSE)
+cfa_df$bad_case <- p_mahal < 0.001
+
+# --- 3. CFA model syntax ---
+cfa_model <- '
+  F1 =~ q62_veg_harvest + inc_agri + farm_self_eval + ext_info_12m + land_cultivated + land_veg
+  F2 =~ inc_total + hope + self_control + age + farm_practice_mean
+  F1 ~~ F2
+'
+
+# --- 4. Estimation settings ---
+ordered_items <- c("farm_self_eval", "farm_practice_mean", "ext_info_12m")
+fit_cfa <- lavaan::cfa(
+  cfa_model,
+  data = cfa_df,
+  std.lv = TRUE,
+  estimator = "WLSMV",
+  ordered = ordered_items,
+  missing = "pairwise"
+)
+
+# --- 5. First-run acceptance criteria ---
+fit_indices <- lavaan::fitMeasures(fit_cfa, c("chisq", "df", "cfi", "rmsea", "srmr"))
+cat("CFA fit indices:\n"); print(fit_indices)
+loadings <- lavaan::inspect(fit_cfa, "std")$lambda
+cat("Standardized loadings:\n"); print(loadings)
+resid_mat_cfa <- lavaan::residuals(fit_cfa, type="cor")$cov
+
+# Drop items with |loading| < .30
+low_loading <- which(abs(loadings) < 0.30, arr.ind=TRUE)
+if (nrow(low_loading) > 0) {
+  cat("Dropping items with |loading| < .30:\n")
+  print(rownames(loadings)[low_loading[,1]])
+}
+# (Optionally refit if any dropped)
+
+# --- 6. Reliability ---
+reliab <- semTools::reliability(fit_cfa)
+cat("\nOmega total (per factor):\n"); print(reliab$omega)
+# Hancock's H
+H_cfa <- apply(loadings, 2, function(lam) sum(lam)^2 / (sum(lam)^2 + sum(1 - lam^2)))
+cat("\nHancock's H (per factor):\n"); print(H_cfa)
+
+# --- 7. Addressing mis-fit ---
+mod_indices <- lavaan::modindices(fit_cfa)
+cat("\nModification indices > 10:\n")
+print(subset(mod_indices, mi > 10))
+# (Add cross-loadings/residuals only if theory justifies and improvement is substantial)
+
+# --- 8. Outlier sensitivity check ---
+fit_cfa_no_out <- lavaan::cfa(
+  cfa_model,
+  data = cfa_df[!cfa_df$bad_case,],
+  std.lv = TRUE,
+  estimator = "WLSMV",
+  ordered = ordered_items,
+  missing = "pairwise"
+)
+loadings_no_out <- lavaan::inspect(fit_cfa_no_out, "std")$lambda
+cat("\nLoadings (no outliers):\n"); print(loadings_no_out)
+loading_shift <- abs(loadings - loadings_no_out)
+cat("\nLoading shifts (abs):\n"); print(loading_shift)
+if (any(loading_shift > 0.10)) {
+  cat("\nIndicators with >.10 shift after outlier removal:\n")
+  print(which(loading_shift > 0.10, arr.ind=TRUE))
+}
+
+# --- 9. Non-linear extension (optional) ---
+# If needed, add quadratic latent F1_sq orthogonal to F1
+# cfa_model_nl <- paste0(cfa_model, '\nF1_sq =~ NA*q62_veg_harvest + NA*inc_agri + NA*farm_self_eval + NA*ext_info_12m + NA*land_cultivated + NA*land_veg\nF1_sq ~~ 0*F1')
+# (Fit as above if required)
+
+# --- 10. Export artefacts ---
+saveRDS(fit_cfa, file = "fit_cfa.rds")
+factor_scores <- lavPredict(fit_cfa, method = "Bartlett")
+write.csv(factor_scores, "factor_scores.csv", row.names = TRUE)
+
+# PDF report
+pdf("cfa_report.pdf", width=10, height=12)
+lavaan::semPaths(fit_cfa, "std", whatLabels="std", edge.label.cex=1.1, layout="tree", style="lisrel")
+plot(1, type="n", axes=FALSE, xlab="", ylab="", main="CFA Fit Indices")
+text(1, 1, paste(capture.output(print(fit_indices)), collapse="\n"), adj=0)
+plot(1, type="n", axes=FALSE, xlab="", ylab="", main="Standardized Loadings")
+text(1, 1, paste(capture.output(print(loadings)), collapse="\n"), adj=0)
+heatmap(resid_mat_cfa, main="CFA Residual Correlation Matrix", symm=TRUE)
+plot(1, type="n", axes=FALSE, xlab="", ylab="", main="Reliability Table")
+text(1, 1, paste(capture.output(print(reliab)), collapse="\n"), adj=0)
+plot(1, type="n", axes=FALSE, xlab="", ylab="", main="Outlier Cases")
+text(1, 1, paste("# bad_case:", sum(cfa_df$bad_case)), adj=0)
+dev.off()
+
+# --- 11. Robust/Bayesian confirmation ---
+fit_bcfa <- blavaan::bcfa(
+  cfa_model,
+  data = cfa_df,
+  std.lv = TRUE,
+  ordered = ordered_items,
+  burnin = 1000, sample = 2000, adapt = 1000
+)
+summary_bcfa <- summary(fit_bcfa)
+cat("\nBayesian CFA summary:\n"); print(summary_bcfa)
+
+# --- 12. Handover to structural phase ---
+cat("\nFinal CFA measurement block:\n")
+cat(cfa_model)
+cat("\nOrdered items:\n"); print(ordered_items)
+cat("\nFactor scores saved to factor_scores.csv\n")
+# Note: For downstream SEM, use estimator = 'MLR' or Bayesian as residuals are mildly right-tailed.
+

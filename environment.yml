@@ -43,3 +43,5 @@ dependencies:
       - gower==0.1.2
       - numdifftools==0.9.41
       - semopy==2.3.11
+  - r-semtools
+  - r-blavaan
