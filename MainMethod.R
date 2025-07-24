@@ -599,8 +599,11 @@ assign_fac <- apply(abs(Lambda0), 1, which.max)
 for (j in seq_len(ncol(Lambda0))) {
   inds <- names(assign_fac)[assign_fac == j & abs(Lambda0[, j]) >= 0.3]
   if (length(inds) >= 2) {
-    alpha_j <- tryCatch(psych::alpha(df_mix2_clean[, inds, drop = FALSE])$total$raw_alpha,
-                        error = function(e) NA_real_)
+    alpha_j <- tryCatch({
+      tmp <- df_mix2_clean[, inds, drop = FALSE]
+      tmp_num <- data.frame(lapply(tmp, function(x) if (is.numeric(x)) x else as.numeric(x)))
+      psych::alpha(tmp_num, check.keys = FALSE)$total$raw_alpha
+    }, error = function(e) NA_real_)
     cat(sprintf("Factor %s Cronbach alpha: %.3f\n", colnames(Lambda0)[j], alpha_j))
   } else {
     cat(sprintf("Factor %s has fewer than two strong indicators; alpha not computed\n",
