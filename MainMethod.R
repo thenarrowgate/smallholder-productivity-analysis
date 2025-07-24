@@ -1196,10 +1196,20 @@ names(cfa_df) <- names(indicator_map)
 cont_vars <- c("q62_veg_harvest", "inc_agri", "land_cultivated", "land_veg", "inc_total", "hope", "self_control", "age")
 cfa_df[cont_vars] <- scale(cfa_df[cont_vars])
 
-# Declare ordered factors
-cfa_df$farm_self_eval     <- ordered(cfa_df$farm_self_eval, levels = sort(unique(cfa_df$farm_self_eval)))
-cfa_df$farm_practice_mean <- ordered(cfa_df$farm_practice_mean, levels = sort(unique(cfa_df$farm_practice_mean)))
-cfa_df$ext_info_12m      <- ordered(cfa_df$ext_info_12m, levels = sort(unique(cfa_df$ext_info_12m)))
+# Declare ordered factors robustly
+ordered_items <- c("farm_self_eval", "farm_practice_mean", "ext_info_12m")
+for (v in ordered_items) {
+  if (!is.ordered(cfa_df[[v]])) {
+    cfa_df[[v]] <- ordered(cfa_df[[v]], levels = sort(unique(cfa_df[[v]])))
+    cat(sprintf("[CFA] Coerced %s to ordered factor.\n", v))
+  }
+}
+
+# Print structure for debugging
+cat("\n[CFA] Structure of CFA data frame:\n")
+print(str(cfa_df))
+cat("\n[CFA] Structure of ordered items:\n")
+print(sapply(cfa_df[ordered_items], class))
 
 # Mahalanobis distance for outlier detection
 mahal_dist <- mahalanobis(as.matrix(cfa_df[cont_vars]), colMeans(cfa_df[cont_vars], na.rm=TRUE), cov(cfa_df[cont_vars], use="pairwise"))
@@ -1214,16 +1224,23 @@ cfa_model <- '
 '
 
 # --- 4. Estimation settings ---
-ordered_items <- c("farm_self_eval", "farm_practice_mean", "ext_info_12m")
-fit_cfa <- lavaan::cfa(
-  cfa_model,
-  data = cfa_df,
-  std.lv = TRUE,
-  estimator = "WLSMV",
-  ordered = ordered_items,
-  missing = "pairwise"
-)
+# Try-catch to print errors if CFA fails
+fit_cfa <- tryCatch({
+  lavaan::cfa(
+    cfa_model,
+    data = cfa_df,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items,
+    missing = "pairwise"
+  )
+}, error = function(e) {
+  cat("\n[CFA ERROR] lavaan::cfa failed:\n")
+  print(e)
+  return(NULL)
+})
 
+if (is.null(fit_cfa)) stop("CFA model did not fit. See error above.")
 # --- 5. First-run acceptance criteria ---
 fit_indices <- lavaan::fitMeasures(fit_cfa, c("chisq", "df", "cfi", "rmsea", "srmr"))
 cat("CFA fit indices:\n"); print(fit_indices)
