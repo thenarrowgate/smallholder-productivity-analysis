@@ -27,6 +27,7 @@ library(reshape2)    # melt()
 library(tidyr)       # pivot_longer()
 library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
+library(mediation)   # causal mediation analysis
 
 # Step 2 ─ Set seed and working directory
 # Resolve where the script is running from so relative paths work both when
@@ -56,8 +57,8 @@ setwd(LOCAL_DIR)
 # predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
-df     <- df %>% select(-Q0__AGR_PROD__continuous,
-                        -Q0__sustainable_livelihood_score__continuous)
+df     <- df %>% dplyr::select(-Q0__AGR_PROD__continuous,
+-Q0__sustainable_livelihood_score__continuous)
 
 # Step 4 ─ Split variables by declared type
 # Variable names encode their measurement level after the final "__".
@@ -999,4 +1000,24 @@ if (length(fac_names) > 1) {
     }
   }
 }
+
+# ---------------------------------------------------------------------
+# 20.4  Mediation test: does F2 act through F1? -------------------------
+# ---------------------------------------------------------------------
+# Theory: household capacity (F2) may boost productivity indirectly by
+# enabling additional F1 investment.  We fit a GAM of F1 on F2 as the
+# mediator model and a GAM of productivity on both F1 and F2 as the
+# outcome model.  The `mediation` package estimates the indirect
+# effect via simulated draws from these fits.
+
+med_model  <- gam(F1 ~ s(F2), data = gam_df, method = "REML")
+out_model  <- gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
+
+med_result <- mediate(med_model, out_model,
+                      treat    = "F2",
+                      mediator = "F1",
+                      sims     = 100,
+                      boot     = TRUE)
+
+print(summary(med_result))
 
