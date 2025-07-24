@@ -27,6 +27,7 @@ library(reshape2)    # melt()
 library(tidyr)       # pivot_longer()
 library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
+library(mediation)   # causal mediation analysis
 
 # Step 2 ─ Set seed and working directory
 # Resolve where the script is running from so relative paths work both when
@@ -1025,3 +1026,23 @@ ggplot(gam_df, aes(F1, prod_index, colour = F2_q)) +
   ) +
   coord_cartesian(clip = "off") +
   theme_classic()
+
+# ---------------------------------------------------------------------
+# 20.4  Mediation test: does F2 act through F1? -------------------------
+# ---------------------------------------------------------------------
+# Theory: household capacity (F2) may boost productivity indirectly by
+# enabling additional F1 investment.  We fit a GAM of F1 on F2 as the
+# mediator model and a GAM of productivity on both F1 and F2 as the
+# outcome model.  The `mediation` package estimates the indirect
+# effect via simulated draws from these fits.
+
+med_model  <- gam(F1 ~ s(F2), data = gam_df, method = "REML")
+out_model  <- gam(prod_index ~ s(F1) + s(F2), data = gam_df, method = "REML")
+
+med_result <- mediate(med_model, out_model,
+                      treat    = "F2",
+                      mediator = "F1",
+                      sims     = 100,
+                      boot     = TRUE)
+
+print(summary(med_result))
