@@ -27,6 +27,9 @@ library(reshape2)    # melt()
 library(tidyr)       # pivot_longer()
 library(WGCNA)   # provides bicor()
 library(Matrix)   # nearPD for KMO/Bartlett
+if (!requireNamespace("mediation", quietly = TRUE)) {
+  stop("Please install the 'mediation' package to run mediation analysis.")
+}
 library(mediation)   # causal mediation analysis
 
 # Step 2 ─ Set seed and working directory
