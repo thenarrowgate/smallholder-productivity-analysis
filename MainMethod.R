@@ -1038,17 +1038,19 @@ if (length(seedling_var) > 0) {
   cat("Using mediator variable:", seedling_var, "\n")
   
   ## Use the same factor as in the GAM fit (rare levels collapsed)
-  seedlings_use <- gam_df[[seedling_var]]
+  seedlings_use <- droplevels(gam_df[[seedling_var]])
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
   if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
     K <- nlevels(seedlings_use) - 1
     y <- as.numeric(seedlings_use) - 1
-    base_form <- as.formula(paste0("y ~ s(F1) + s(F2) + ti(F1, F2)"))
-    f_list <- c(base_form,
-                replicate(K - 1,
-                          as.formula("~ s(F1) + s(F2) + ti(F1, F2)")))
-    m_a <- gam(f_list, family = mgcv::multinom(K = K),
+    form_list <- vector("list", K)
+    form_list[[1]] <-
+      as.formula("y ~ s(F1) + s(F2) + ti(F1, F2)")
+    for (j in 2:K) {
+      form_list[[j]] <- as.formula("~ s(F1) + s(F2) + ti(F1, F2)")
+    }
+    m_a <- gam(form_list, family = mgcv::multinom(K = K),
                data = transform(gam_df, y = y))
   } else {
     m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
