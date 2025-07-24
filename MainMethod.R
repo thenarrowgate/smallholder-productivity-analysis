@@ -1021,3 +1021,43 @@ med_result <- mediate(med_model, out_model,
 
 print(summary(med_result))
 
+## ---------------------------------------------------------------------
+## 3.  Moderated mediation: F1 → seedlings → productivity with F2 moderator
+## ---------------------------------------------------------------------
+seedling_var <- grep("seedling", names(gam_df), ignore.case = TRUE, value = TRUE)
+if (length(seedling_var) > 0) {
+  seedling_var <- seedling_var[1]
+  cat("Using mediator variable:", seedling_var, "\n")
+  
+  ## Use the same factor as in the GAM fit (rare levels collapsed)
+  seedlings_use <- droplevels(gam_df[[seedling_var]])
+
+  ## a-path: does F1 predict seedling use and does that depend on F2?
+  if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
+    K <- nlevels(seedlings_use) - 1
+    y <- as.numeric(seedlings_use) - 1
+    form_list <- vector("list", K)
+    form_list[[1]] <-
+      as.formula("y ~ s(F1) + s(F2) + ti(F1, F2)")
+    for (j in 2:K) {
+      form_list[[j]] <- as.formula("~ s(F1) + s(F2) + ti(F1, F2)")
+    }
+    m_a <- gam(form_list, family = mgcv::multinom(K = K),
+               data = transform(gam_df, y = y))
+  } else {
+    m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
+               family = binomial, data = gam_df)
+  }
+  print(summary(m_a))
+  print(m_a)
+
+  ## b-path: does the seedling → productivity effect vary with F2?
+  m_b <- gam(prod_index ~ s(F1) + s(F2) + seedlings_use + seedlings_use:F2,
+             data = gam_df, method = "REML")
+  print(m_b)
+  print(summary(m_b))
+  anova(m_b, test = "Chisq")
+} else {
+  cat("No seedlings variable found for moderated mediation test\n")
+}
+
