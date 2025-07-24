@@ -905,3 +905,123 @@ ggplot(gam_df, aes(F1, prod_index, colour = cut(F2, c(-Inf, -0.5, 0.5, Inf)))) +
   geom_point(alpha = .3) +
   stat_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = FALSE) +
   theme_classic()
+
+## ----------------------------------------------------------------------
+## 1.  Robustness: refit after trimming the extreme 9-unit outlier
+## ----------------------------------------------------------------------
+# (1a) identify & drop the max-value observation
+thr      <- max(gam_df$prod_index, na.rm = TRUE)       # 9-unit point
+gam_df_t <- filter(gam_df, prod_index < thr)
+
+# (1b) refit the interaction GAM on the trimmed data
+m_int_t <- gam(prod_index ~ te(F1, F2, k = c(9, 9)),
+               data   = gam_df_t,
+               method = "REML")
+
+# (1c) helper to compute Δ table at chosen F1 points
+simple_slope <- function(model, F1_pts = 0:4,
+                         F2_hi = +1, F2_lo = -1) {
+  new_hi <- data.frame(F1 = F1_pts, F2 = F2_hi)
+  new_lo <- data.frame(F1 = F1_pts, F2 = F2_lo)
+  
+  pr_hi  <- predict(model, new_hi,  se.fit = TRUE)
+  pr_lo  <- predict(model, new_lo,  se.fit = TRUE)
+  
+  delta  <- pr_hi$fit - pr_lo$fit
+  se     <- sqrt(pr_hi$se.fit^2 + pr_lo$se.fit^2)
+  ci_lo  <- delta - 1.96 * se
+  ci_hi  <- delta + 1.96 * se
+  
+  tibble(F1      = F1_pts,
+         diff    = delta,
+         CI_lo   = ci_lo,
+         CI_hi   = ci_hi)
+}
+
+# (1d) compare original vs trimmed Δ tables
+tbl_orig <- simple_slope(m_int)
+tbl_trim <- simple_slope(m_int_t)
+
+comparison <- left_join(tbl_orig  %>% rename_with(~paste0(.x, "_orig"), -F1),
+                        tbl_trim %>% rename_with(~paste0(.x, "_trim"), -F1),
+                        by = "F1") |>
+  mutate(delta_change = diff_trim - diff_orig)
+
+print(comparison)
+
+## ----------------------------------------------------------------------
+## 2.  Alternative centring: F2 as quartile factor & by-factor smooths
+## ----------------------------------------------------------------------
+# (2a) cut F2 into quartiles (equal-count bins)
+gam_df <- gam_df %>%
+  mutate(F2_q = cut(F2,
+                    breaks = quantile(F2, probs = seq(0, 1, 0.25),
+                                      na.rm = TRUE),
+                    include.lowest = TRUE,
+                    labels = c("Q1","Q2","Q3","Q4")))
+
+# (2b) GAM with separate smooth of F1 within each quartile
+m_by_q <- gam(prod_index ~ s(F1, by = F2_q, k = 9) + F2_q,
+              data   = gam_df,
+              method = "REML",
+              drop.unused.levels = FALSE)
+summary(m_by_q)
+
+# (2c) plot the four smooths
+plot(m_by_q, pages = 1, shade = TRUE, seWithMean = TRUE)
+
+
+# ---------------------------------------------------------------------
+# 1.  Prepare data  ----------------------------------------------------
+# ---------------------------------------------------------------------
+# high-F1 breaks and labels from earlier code --------------------------
+band_breaks <- c(1.17, 2, 3, 4, 5, max(gam_df$F1))
+band_labels <- c("1.17–2", "2–3", "3–4", "4–5", "5+")
+
+# data                                ----------------------------------
+gam_df <- gam_df %>%
+  mutate(
+    F1_band = cut(
+      F1,
+      breaks = band_breaks,
+      right  = FALSE,
+      labels = band_labels
+    )
+  )
+
+# mid-points for every label          ----------------------------------
+band_centers <- tibble(
+  F1_band = band_labels,
+  x_pos   = (head(band_breaks, -1) + tail(band_breaks, -1)) / 2   # midpoint
+)
+
+# counts + x positions
+band_counts <- gam_df %>%
+  filter(!is.na(F1_band)) %>%
+  count(F1_band) %>%
+  left_join(band_centers, by = "F1_band") %>%
+  mutate(y_pos = Inf)
+
+# ---------------------------------------------------------------------
+# 2.  Plot  ------------------------------------------------------------
+# ---------------------------------------------------------------------
+ggplot(gam_df, aes(F1, prod_index, colour = F2_q)) +
+  geom_point(alpha = .25) +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = TRUE) +
+  geom_rug(alpha = 0.3) +
+  geom_text(
+    data        = band_counts,
+    aes(x = x_pos, y = y_pos, label = n),
+    vjust       = 1.2,
+    size        = 3.2,
+    inherit.aes = FALSE
+  ) +
+  scale_colour_brewer(palette = "Dark2", name = "F2 quartile") +
+  labs(
+    title    = "F1 → Productivity curves by F2 quartile",
+    subtitle = "Numbers indicate sample size in each high-F1 band",
+    x        = "F1 (z-score)",
+    y        = "Partial effect on productivity"
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_classic()
