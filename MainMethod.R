@@ -833,7 +833,7 @@ prod_quad <- indProd(
   prod_base,
   var1      = f1_vars,
   var2      = f1_vars,
-  match     = FALSE,
+  match     = TRUE,
   meanC     = TRUE,
   residualC = FALSE,
   doubleMC  = TRUE,
