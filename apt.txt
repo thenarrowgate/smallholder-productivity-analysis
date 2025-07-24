@@ -16,3 +16,4 @@ r-cran-reshape2
 r-cran-tidyr
 r-cran-wgcna
 r-cran-matrix
+r-cran-semtools
