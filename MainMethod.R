@@ -1042,8 +1042,8 @@ if (length(seedling_var) > 0) {
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
   if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
-    K <- nlevels(seedlings_use) - 1
-    y <- as.numeric(seedlings_use) - 1
+    K <- nlevels(seedlings_use)
+    y <- as.numeric(seedlings_use)
     form_list <- vector("list", K)
     form_list[[1]] <-
       as.formula("y ~ s(F1) + s(F2) + ti(F1, F2)")
@@ -1057,10 +1057,12 @@ if (length(seedling_var) > 0) {
                family = binomial, data = gam_df)
   }
   print(summary(m_a))
+  print(m_a)
 
   ## b-path: does the seedling → productivity effect vary with F2?
   m_b <- gam(prod_index ~ s(F1) + s(F2) + seedlings_use + seedlings_use:F2,
              data = gam_df, method = "REML")
+  print(m_b)
   print(summary(m_b))
   anova(m_b, test = "Chisq")
 } else {
