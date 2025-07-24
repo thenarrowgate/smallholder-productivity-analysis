@@ -1032,18 +1032,19 @@ ggplot(gam_df, aes(F1, prod_index, colour = F2_q)) +
 # ---------------------------------------------------------------------------
 # Theory: On-farm capital (F1) raises the probability of using
 # self-prepared seedlings (Q56), which then boosts productivity.
-if ("Q56__For_vegetables_do_you_use_seedlings__nominal" %in% names(df_nom)) {
-  seed_raw <- df_nom[["Q56__For_vegetables_do_you_use_seedlings__nominal"]]
-
-  # binary indicator: TRUE if "Self_prepared_seedlings" appears in the response
-  seed_bin <- grepl("Self_prepared_seedlings", seed_raw)
-  gam_df$seedlings <- factor(seed_bin)
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (seed_var %in% names(gam_df)) {
+  # use the same collapsed factor as in the productivity GAM
+  gam_df$seedlings <- gam_df[[seed_var]]
 
   message("\n=== GAM mediation test: F1 → Q56 → productivity ===")
 
-  # a) does F1 predict self-prepared seedlings usage?
-  gam_seed <- mgcv::gam(seedlings ~ s(F1), data = gam_df,
-                        family = binomial, method = "REML")
+  # a) does F1 predict the seedling practice categories?
+  seed_num <- as.numeric(gam_df$seedlings) - 1
+  K <- nlevels(gam_df$seedlings) - 1
+  flist <- c(list(seed_num ~ s(F1)), rep(list(~s(F1)), K))
+  gam_seed <- mgcv::gam(flist, data = data.frame(gam_df, seed_num),
+                        family = mgcv::multinom(K = K), method = "REML")
   print(summary(gam_seed))
 
   # b) effect of F1 on productivity controlling for Q56
