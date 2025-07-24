@@ -56,7 +56,7 @@ setwd(LOCAL_DIR)
 # predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
-df     <- df %>% select(-Q0__AGR_PROD__continuous,
+df     <- df %>% dplyr::select(-Q0__AGR_PROD__continuous,
                         -Q0__sustainable_livelihood_score__continuous)
 
 # Step 4 ─ Split variables by declared type
@@ -1042,12 +1042,18 @@ if (length(seedling_var) > 0) {
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
   if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
-    fam <- mgcv::multinom(K = nlevels(seedlings_use))
+    K <- nlevels(seedlings_use) - 1
+    y <- as.numeric(seedlings_use) - 1
+    base_form <- as.formula(paste0("y ~ s(F1) + s(F2) + ti(F1, F2)"))
+    f_list <- c(base_form,
+                replicate(K - 1,
+                          as.formula("~ s(F1) + s(F2) + ti(F1, F2)")))
+    m_a <- gam(f_list, family = mgcv::multinom(K = K),
+               data = transform(gam_df, y = y))
   } else {
-    fam <- binomial
+    m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
+               family = binomial, data = gam_df)
   }
-  m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
-             family = fam, data = gam_df)
   print(summary(m_a))
 
   ## b-path: does the seedling → productivity effect vary with F2?
