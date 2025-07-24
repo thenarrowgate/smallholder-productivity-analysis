@@ -648,7 +648,8 @@ gam_df <- na.omit(gam_df)
 fit_gam <- function(df, smooth_terms, small_terms, large_terms) {
   all_terms <- c(smooth_terms, small_terms, large_terms)
   form <- as.formula(paste("prod_index ~", paste(all_terms, collapse = " + ")))
-  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE)
+  fit  <- mgcv::gam(form, data = df, method = "REML", select = TRUE,
+                    drop.unused.levels = FALSE)
   print(summary(fit)$s.table)
   print(summary(fit)$p.table)
   par(mfrow = c(1, ncol(F_hat)))
@@ -692,7 +693,8 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
         train[[fc]] <- factor(train[[fc]], levels = levels(data[[fc]]))
         test[[fc]]  <- factor(test[[fc]],  levels = levels(data[[fc]]))
       }
-      m  <- mgcv::gam(form, data = train, method = "REML")
+      m <- mgcv::gam(form, data = data[ids != i, ], method = "REML",
+                     drop.unused.levels = FALSE)
       pr <- predict(m, newdata = test, na.action = na.exclude)
       dev[i] <- mean((test$prod_index - pr)^2, na.rm = TRUE)
     }
@@ -717,7 +719,8 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
     as.formula(paste("prod_index ~", paste(refit_terms, collapse = " + ")))
   }
 
-  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE)
+  refit <- mgcv::gam(refit_form, data = df, method = "REML", select = TRUE,
+                     drop.unused.levels = FALSE)
   cat("AIC(original)=", AIC(fit), " AIC(refit)=", AIC(refit), "\n")
   print(summary(refit)$s.table)
   print(summary(refit)$p.table)
@@ -742,13 +745,15 @@ gam_diagnostics <- function(fit, df, smooth_terms, large_terms) {
     }
 
     hi_form <- as.formula(paste("prod_index ~", paste(c(hi_terms, signif_terms, large_terms), collapse = " + ")))
-    refit_hi <- mgcv::gam(hi_form, data = df, method = "REML", select = TRUE)
+    refit_hi <- mgcv::gam(hi_form, data = df, method = "REML", select = TRUE,
+                          drop.unused.levels = FALSE)
     cat("AIC(high-k)=", AIC(refit_hi), "\n")
     anova(refit, refit_hi, test = "Chisq")
   }
   alt_terms <- gsub("s\\(([^)]+)\\)", "s(\\1, bs='cs')", smooth_terms)
   alt_form <- as.formula(paste("prod_index ~", paste(c(alt_terms, signif_terms, large_terms), collapse = " + ")))
-  gam_alt <- mgcv::gam(alt_form, data = df, method = "REML", select = TRUE)
+  gam_alt <- mgcv::gam(alt_form, data = df, method = "REML", select = TRUE,
+                       drop.unused.levels = FALSE)
   cat("AIC(cs basis)=", AIC(gam_alt), "\n")
   anova(refit, gam_alt, test = "Chisq")
 
@@ -775,7 +780,8 @@ print(cor(F_hat))
 # 2. Univariate smooths for each factor
 for (f in colnames(F_hat)) {
   form <- as.formula(paste("prod_index ~ s(", f, ")"))
-  m_single <- mgcv::gam(form, data = gam_df, method = "REML")
+  m_single <- mgcv::gam(form, data = gam_df, method = "REML",
+                        drop.unused.levels = FALSE)
   cat("\n--- Smooth effect for", f, "---\n")
   print(summary(m_single))
   plot(m_single, shade = TRUE)
@@ -790,8 +796,10 @@ if (length(fac_names) > 1) {
     f1 <- p[1]; f2 <- p[2]
     form_te  <- as.formula(paste("prod_index ~ te(", f1, ", ", f2, ")"))
     form_add <- as.formula(paste("prod_index ~ s(", f1, ") + s(", f2, ")"))
-    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML")
-    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML")
+    m_te <- mgcv::gam(form_te, data = gam_df, method = "REML",
+                      drop.unused.levels = FALSE)
+    m_add <- mgcv::gam(form_add, data = gam_df, method = "REML",
+                       drop.unused.levels = FALSE)
     cat("\n--- Tensor interaction model (", f1, " × ", f2, ") ---\n")
     print(summary(m_te))
     vis.gam(m_te, view = c(f1, f2), plot.type = "persp",
@@ -851,7 +859,8 @@ if (length(fac_names) > 1) {
     m_te <- mgcv::gam(
       as.formula(paste0("prod_index ~ te(", f1, ", ", f2, ")")),
       data = gam_df,
-      method = "REML"
+      method = "REML",
+      drop.unused.levels = FALSE
     )
     
     # correct argument order: model, df, factors-vector
