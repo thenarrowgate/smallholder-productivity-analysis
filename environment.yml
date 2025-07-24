@@ -38,6 +38,9 @@ dependencies:
   - r-foreach
   - r-ggplot2
   - r-reshape2
+  - r-semtools
+  - r-semplot
+  - r-blavaan
   - pip
   - pip:
       - gower==0.1.2

@@ -1159,6 +1159,120 @@ if (seed_var %in% names(gam_df)) {
   cat("ΔAIC =", AIC(gam_base) - AIC(gam_med), "\n")
   print(summary(gam_med))
 } else {
-  message("Q56 variable not found; skipping mediation check")
+message("Q56 variable not found; skipping mediation check")
+}
+
+# ---------------------------------------------------------------------------
+# 23. Robust Confirmatory Factor Analysis (CFA)
+# ---------------------------------------------------------------------------
+
+# --- 23.1 Data block -------------------------------------------------------
+# Keep the indicators with EFA loadings ≥ 0.30 and rename to concise aliases
+alias_map <- c(
+  q62_veg_harvest   = "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
+  inc_agri          = "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
+  farm_self_eval    = "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+  ext_info_12m      = "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1",
+  land_cultivated   = "Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous",
+  land_veg          = "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous",
+  inc_total         = "Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous",
+  hope              = "Q0__hope_total__continuous",
+  self_control      = "Q0__self_control_score__continuous",
+  age               = "Q5__AgeYears__continuous",
+  farm_practice_mean= "Q0__average_of_farming_practices__ordinal"
+)
+
+cfa_df <- df_mix2_clean[, unname(alias_map), drop = FALSE]
+names(cfa_df) <- names(alias_map)
+
+# --- 23.2 Pre-processing ---------------------------------------------------
+# Z-score continuous variables and declare ordered factors
+cont_cols <- c("q62_veg_harvest", "inc_agri", "land_cultivated", "land_veg",
+               "inc_total", "hope", "self_control", "age")
+cfa_df[cont_cols] <- scale(cfa_df[cont_cols])
+
+cfa_df$farm_self_eval     <- ordered(cfa_df$farm_self_eval,
+                                     levels = sort(unique(cfa_df$farm_self_eval)))
+cfa_df$farm_practice_mean <- ordered(cfa_df$farm_practice_mean,
+                                     levels = sort(unique(cfa_df$farm_practice_mean)))
+cfa_df$ext_info_12m       <- ordered(cfa_df$ext_info_12m,
+                                     levels = sort(unique(cfa_df$ext_info_12m)))
+
+# Mahalanobis distances for outlier tagging
+md <- mahalanobis(cfa_df[cont_cols], colMeans(cfa_df[cont_cols]), cov(cfa_df[cont_cols]))
+cfa_df$bad_case <- pchisq(md, df = length(cont_cols), lower.tail = FALSE) < 0.001
+
+# --- 23.3 Baseline congeneric CFA model -----------------------------------
+cfa_mod <- '
+  F1 =~ q62_veg_harvest + inc_agri + farm_self_eval + ext_info_12m +
+        land_cultivated + land_veg
+  F2 =~ inc_total + hope + self_control + age + farm_practice_mean
+  F1 ~~ F2
+'
+
+fit_cfa <- lavaan::cfa(
+  model     = cfa_mod,
+  data      = cfa_df,
+  std.lv    = TRUE,
+  estimator = "WLSMV",
+  ordered   = c("farm_self_eval", "farm_practice_mean", "ext_info_12m"),
+  missing   = "pairwise"
+)
+
+cat("\n=== CFA fit indices ===\n")
+print(fitMeasures(fit_cfa, c("chisq", "df", "cfi", "rmsea", "srmr")))
+
+std_load <- lavaan::standardizedSolution(fit_cfa)
+resid_mat_cfa <- lavaan::residuals(fit_cfa, type = "cor")
+
+# --- 23.4 Reliability ------------------------------------------------------
+if (requireNamespace("semTools", quietly = TRUE)) {
+  cat("\nOmega total and Hancock's H:\n")
+  print(semTools::reliability(fit_cfa))
+}
+
+# --- 23.5 Modification indices --------------------------------------------
+mi <- lavaan::modindices(fit_cfa)
+mi <- mi[order(mi$mi, decreasing = TRUE), ]
+cat("\nTop modification indices (>10):\n")
+print(head(subset(mi, mi > 10), 10))
+
+# --- 23.6 Outlier sensitivity check ---------------------------------------
+fit_cfa_clean <- lavaan::cfa(
+  model     = cfa_mod,
+  data      = cfa_df[!cfa_df$bad_case, ],
+  std.lv    = TRUE,
+  estimator = "WLSMV",
+  ordered   = c("farm_self_eval", "farm_practice_mean", "ext_info_12m"),
+  missing   = "pairwise"
+)
+
+load_orig  <- subset(std_load, op == "=~", select = c("lhs", "rhs", "est.std"))
+load_clean <- subset(lavaan::standardizedSolution(fit_cfa_clean),
+                     op == "=~", select = "est.std")
+load_compare <- cbind(load_orig, clean = load_clean$est.std)
+print(load_compare)
+
+# --- 23.7 Export artefacts -------------------------------------------------
+saveRDS(fit_cfa, file = "fit_cfa.rds")
+write.csv(lavPredict(fit_cfa, method = "Bartlett"), "factor_scores.csv")
+
+if (requireNamespace("semPlot", quietly = TRUE)) {
+  pdf("cfa_diagram.pdf")
+  semPlot::semPaths(fit_cfa, whatLabels = "std", layout = "tree")
+  dev.off()
+}
+
+# Optional Bayesian confirmation if blavaan is available
+if (requireNamespace("blavaan", quietly = TRUE)) {
+  fit_bayes <- blavaan::bcfa(
+    cfa_mod,
+    data   = cfa_df,
+    std.lv = TRUE,
+    burnin = 1000,
+    sample = 2000
+  )
+  saveRDS(fit_bayes, file = "fit_cfa_bayes.rds")
+  cat("\nPosterior predictive p-value:", blavaan::pppvalue(fit_bayes), "\n")
 }
 

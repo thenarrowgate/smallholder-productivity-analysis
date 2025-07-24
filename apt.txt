@@ -22,3 +22,6 @@ r-cran-sandwich
 r-cran-lpsolve
 r-cran-hmisc
 r-cran-lme4
+r-cran-semtools
+r-cran-semplot
+r-cran-blavaan
