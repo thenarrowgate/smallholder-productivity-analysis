@@ -1025,3 +1025,30 @@ ggplot(gam_df, aes(F1, prod_index, colour = F2_q)) +
   ) +
   coord_cartesian(clip = "off") +
   theme_classic()
+
+## ---------------------------------------------------------------------
+## 3.  Moderated mediation: F1 → seedlings → productivity with F2 moderator
+## ---------------------------------------------------------------------
+seedling_var <- grep("seedling", names(gam_df), ignore.case = TRUE, value = TRUE)
+if (length(seedling_var) > 0) {
+  seedling_var <- seedling_var[1]
+  cat("Using mediator variable:", seedling_var, "\n")
+  gam_df$seedlings_use <- if (is.factor(gam_df[[seedling_var]])) {
+    as.numeric(!grepl("No", gam_df[[seedling_var]], ignore.case = TRUE))
+  } else {
+    as.numeric(gam_df[[seedling_var]])
+  }
+
+  ## a-path: does F1 predict seedling use and does that depend on F2?
+  m_a <- gam(seedlings_use ~ s(F1) + s(F2) + ti(F1, F2),
+             family = binomial, data = gam_df)
+  print(summary(m_a))
+
+  ## b-path: does the seedling → productivity effect vary with F2?
+  m_b <- gam(prod_index ~ s(F1) + s(F2) + seedlings_use + seedlings_use:F2,
+             data = gam_df, method = "REML")
+  print(summary(m_b))
+  anova(m_b, test = "Chisq")
+} else {
+  cat("No seedlings variable found for moderated mediation test\n")
+}
