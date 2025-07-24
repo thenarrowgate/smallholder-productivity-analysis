@@ -1042,8 +1042,8 @@ if (length(seedling_var) > 0) {
 
   ## a-path: does F1 predict seedling use and does that depend on F2?
   if (is.factor(seedlings_use) && nlevels(seedlings_use) > 2) {
-    K <- nlevels(seedlings_use)
-    y <- as.numeric(seedlings_use)
+    K <- nlevels(seedlings_use) - 1
+    y <- as.numeric(seedlings_use) - 1
     form_list <- vector("list", K)
     form_list[[1]] <-
       as.formula("y ~ s(F1) + s(F2) + ti(F1, F2)")
