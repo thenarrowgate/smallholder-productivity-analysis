@@ -638,6 +638,22 @@ collapse_rare <- function(f, threshold = 0.05) {
 
 
 nom_collapsed <- df_nom %>% mutate(across(everything(), collapse_rare))
+
+# -- Inspect specific seedling variable counts after collapsing -------------
+seed_var <- "Q56__For_vegetables_do_you_use_seedlings__nominal"
+if (seed_var %in% names(nom_collapsed)) {
+  seed_counts <- table(nom_collapsed[[seed_var]])
+  cat("Counts for", seed_var, "after collapse_rare():\n")
+  print(seed_counts)
+  low_levels <- names(seed_counts)[seed_counts < 5]
+  if (length(low_levels) > 0) {
+    cat("Merging <5 obs levels into 'Other':\n")
+    print(low_levels)
+    tmp <- as.character(nom_collapsed[[seed_var]])
+    tmp[tmp %in% low_levels] <- "Other"
+    nom_collapsed[[seed_var]] <- factor(tmp)
+  }
+}
 is_large <- function(v) nlevels(v) > 10
 large_noms <- names(Filter(is_large, nom_collapsed))
 small_noms <- names(Filter(Negate(is_large), nom_collapsed))
