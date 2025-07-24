@@ -1042,7 +1042,7 @@ if (seed_var %in% names(gam_df)) {
   # a) does F1 predict the seedling practice categories?
   seed_num <- as.numeric(gam_df$seedlings) - 1
   K <- nlevels(gam_df$seedlings) - 1
-  flist <- c(list(seed_num ~ s(F1)), rep(list(~s(F1)), K))
+  flist <- c(list(seed_num ~ s(F1)), rep(list(~s(F1)), K - 1))
   gam_seed <- mgcv::gam(flist, data = data.frame(gam_df, seed_num),
                         family = mgcv::multinom(K = K), method = "REML")
   print(summary(gam_seed))
