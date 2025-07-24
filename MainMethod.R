@@ -880,11 +880,12 @@ diagnose_F1_F2 <- function(df) {
   print(cbind(F1 = pts, diff = round(delta, 2),
               CI_lo = round(cil, 2), CI_hi = round(ciu, 2)))
 
-  ggplot(df, aes(F1, prod_index,
+  p1 <- ggplot(df, aes(F1, prod_index,
                  colour = cut(F2, c(-Inf, -0.5, 0.5, Inf)))) +
     geom_point(alpha = 0.3) +
     stat_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = FALSE) +
     theme_classic()
+  print(p1)
 
   # ---- Robustness check: trim extreme productivity value -------------
   thr      <- max(df$prod_index, na.rm = TRUE)
@@ -949,7 +950,7 @@ diagnose_F1_F2 <- function(df) {
     left_join(band_centers, by = "F1_band") %>%
     mutate(y_pos = Inf)
 
-  ggplot(df_q, aes(F1, prod_index, colour = F2_q)) +
+  p2 <- ggplot(df_q, aes(F1, prod_index, colour = F2_q)) +
     geom_point(alpha = 0.25) +
     geom_smooth(method = "gam", formula = y ~ s(x, bs = "tp"), se = TRUE) +
     geom_rug(alpha = 0.3) +
@@ -969,6 +970,9 @@ diagnose_F1_F2 <- function(df) {
     ) +
     coord_cartesian(clip = "off") +
     theme_classic()
+  print(p2)
+
+  invisible(list(p1 = p1, p2 = p2))
 }
 
 fac_names <- colnames(F_hat)
