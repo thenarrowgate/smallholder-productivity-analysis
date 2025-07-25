@@ -1303,3 +1303,87 @@ if (!is.null(factor_scores)) {
 resid_mat_cfa <- lavaan::residuals(fit_cfa, type = "cor")$cov
 heatmap(resid_mat_cfa, main = "CFA Residual Correlation Matrix", symm = TRUE)
 
+# --- 10. Suggested model modification based on highest MI (do not remove indicators) ---
+mod_indices <- lavaan::modindices(fit_cfa)
+mod_indices <- mod_indices[order(-mod_indices$mi), ]
+mod_indices_to_add <- subset(mod_indices, mi > 10 & !(op == "~1" | op == "~"))
+
+if (nrow(mod_indices_to_add) > 0) {
+  top_mi <- mod_indices_to_add[1, ]
+  cat("\n[SUGGESTED MODIFICATION] Add the following to the model for improved fit (MI = ",
+      round(top_mi$mi, 2), "):\n  ",
+      top_mi$lhs, top_mi$op, top_mi$rhs, "\n", sep = "")
+}
+
+# --- 11. Automated MI-based model refinement (do not remove indicators) ---
+# This block will iteratively add the top MI-suggested cross-loading or residual correlation (MI > 10)
+# to the model, refit, and repeat up to max_steps or until no MI > 10 remain.
+# The refined model and fit indices will be printed at each step.
+
+# --- Automated MI-based model refinement ---
+max_steps <- 5  # Set the maximum number of MI-based modifications
+cfa_model_refined <- cfa_model
+fit_cfa_refined <- fit_cfa
+added_mods <- character(0)
+
+for (step in 1:max_steps) {
+  mi_ref <- lavaan::modindices(fit_cfa_refined)
+  mi_ref <- mi_ref[order(-mi_ref$mi), ]
+  mi_to_add <- subset(mi_ref, mi > 10 & !(op == "~1" | op == "~") & !paste(lhs, op, rhs) %in% added_mods)
+  if (nrow(mi_to_add) == 0) {
+    cat("\n[MI-REFINEMENT] No more MI > 10 to add. Stopping refinement.\n")
+    break
+  }
+  top_mi <- mi_to_add[1, ]
+  new_line <- paste(top_mi$lhs, top_mi$op, top_mi$rhs)
+  cfa_model_refined <- paste(cfa_model_refined, new_line, sep = "\n")
+  added_mods <- c(added_mods, new_line)
+  cat("\n[MI-REFINEMENT] Step", step, ": Adding", new_line, "(MI =", round(top_mi$mi, 2), ")\n")
+  fit_cfa_refined <- tryCatch({
+    lavaan::cfa(
+      cfa_model_refined,
+      data = cfa_df,
+      std.lv = TRUE,
+      estimator = "WLSMV",
+      ordered = ordered_items
+    )
+  }, error = function(e) {
+    cat("[MI-REFINEMENT ERROR] lavaan::cfa failed after adding:", new_line, "\n")
+    print(e)
+    return(fit_cfa_refined)  # Return previous fit
+  })
+  fit_indices_ref <- lavaan::fitMeasures(fit_cfa_refined, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  cat("[MI-REFINEMENT] Fit indices after step", step, ":\n")
+  print(fit_indices_ref)
+}
+
+# --- Final model diagnostics and residuals ---
+cat("\n[FINAL MODEL] Standardized solution:\n")
+print(summary(fit_cfa_refined, standardized = TRUE))
+
+# Print all negative residual variances (Heywood cases)
+cat("\n[FINAL MODEL] Negative residual variances (Heywood cases):\n")
+par_table <- lavaan::parTable(fit_cfa_refined)
+neg_resid <- subset(par_table, op == "~~" & lhs == rhs & est < 0)
+if (nrow(neg_resid) > 0) {
+  print(neg_resid[, c("lhs", "est")])
+} else {
+  cat("None detected.\n")
+}
+
+# Plot residuals heatmap for the final model
+cat("\n[FINAL MODEL] Residual correlation heatmap:\n")
+resid_mat_final <- lavaan::residuals(fit_cfa_refined, type = "cor")$cov
+heatmap(resid_mat_final, main = "Final CFA Residual Correlation Matrix", symm = TRUE)
+
+# Print all MI > 10 for the final model
+cat("\n[FINAL MODEL] Modification indices (MI > 10):\n")
+mod_indices_final <- lavaan::modindices(fit_cfa_refined)
+mod_indices_final <- mod_indices_final[order(-mod_indices_final$mi), ]
+high_mi_final <- subset(mod_indices_final, mi > 10 & !(op == "~1" | op == "~"))
+if (nrow(high_mi_final) > 0) {
+  print(high_mi_final[, c("lhs", "op", "rhs", "mi")])
+} else {
+  cat("No MI > 10 remain.\n")
+}
+
