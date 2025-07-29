@@ -1387,3 +1387,484 @@ if (nrow(high_mi_final) > 0) {
   cat("No MI > 10 remain.\n")
 }
 
+# ---------------------------------------------------------------------------
+# 23. Advanced Diagnostic Checks and Model Refinements
+# ---------------------------------------------------------------------------
+
+cat("\n", strrep("=", 80), "\n")
+cat("ADVANCED DIAGNOSTIC CHECKS AND MODEL REFINEMENTS\n")
+cat(strrep("=", 80), "\n")
+
+# --- 1. Resolve Q70 Heywood Case ---
+cat("\n[DIAGNOSTIC 1] Resolving Q70 Heywood Case\n")
+cat(strrep("-", 50), "\n")
+
+# Check if Q70 has negative residual variance
+q70_neg_resid <- subset(par_table, op == "~~" & lhs == "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1" & rhs == "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1" & est < 0)
+if (nrow(q70_neg_resid) > 0) {
+  cat("Q70 has negative residual variance:", round(q70_neg_resid$est, 4), "\n")
+  
+  # 1a. Temporarily fix Q70 residual variance
+  cat("\n[1a] Fixing Q70 residual variance to 0.01...\n")
+  cfa_model_fixed <- cfa_model_refined
+  cfa_model_fixed <- paste0(cfa_model_fixed, "\nQ70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1 ~~ 0.01*Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1")
+  
+  fit_cfa_fixed <- tryCatch({
+    lavaan::cfa(
+      cfa_model_fixed,
+      data = cfa_df,
+      std.lv = TRUE,
+      estimator = "WLSMV",
+      ordered = ordered_items
+    )
+  }, error = function(e) {
+    cat("[ERROR] Fixed model failed to converge:\n")
+    print(e)
+    return(NULL)
+  })
+  
+  if (!is.null(fit_cfa_fixed)) {
+    cat("Fixed model fit indices:\n")
+    print(lavaan::fitMeasures(fit_cfa_fixed, c("chisq", "df", "cfi", "rmsea", "srmr")))
+    
+    # Compare standardized loadings
+    cat("\nQ70 loading comparison:\n")
+    orig_loading <- lavaan::inspect(fit_cfa_refined, "std")$lambda["Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1", ]
+    fixed_loading <- lavaan::inspect(fit_cfa_fixed, "std")$lambda["Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1", ]
+    cat("Original:", round(orig_loading, 3), "\n")
+    cat("Fixed:", round(fixed_loading, 3), "\n")
+  }
+  
+  # 1b. Examine Q70 binary coding and distribution
+  cat("\n[1b] Examining Q70 distribution and coding:\n")
+  q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+  if (q70_var %in% names(cfa_df)) {
+    q70_tab <- table(cfa_df[[q70_var]], useNA = "ifany")
+    cat("Q70 frequency table:\n")
+    print(q70_tab)
+    cat("Proportions:\n")
+    print(round(prop.table(q70_tab), 3))
+    
+    # Check for sparse categories
+    sparse_cats <- q70_tab[q70_tab < 10]
+    if (length(sparse_cats) > 0) {
+      cat("\nSparse categories (< 10 observations):\n")
+      print(sparse_cats)
+      cat("Consider merging these categories.\n")
+    }
+  }
+} else {
+  cat("Q70 does not have negative residual variance.\n")
+}
+
+# --- 2. Probe Q112-Q70 Relationship ---
+cat("\n[DIAGNOSTIC 2] Probing Q112-Q70 Relationship\n")
+cat(strrep("-", 50), "\n")
+
+# 2a. Test three-factor model with dedicated "Market-engagement/Information" factor
+cat("\n[2a] Testing three-factor model with dedicated Market-engagement/Information factor...\n")
+
+# Create three-factor model syntax
+cfa_model_3f <- c()
+# F1: Commercial-Orientation (production-focused items)
+f1_items <- c("Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
+               "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
+               "Q0__hope_total__continuous")
+f1_syntax <- paste("F1 =~", paste(f1_items, collapse = " + "))
+
+# F2: Household Resources & Experience
+f2_items <- c("Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous",
+               "Q5__AgeYears__continuous",
+               "Q0__self_control_score__continuous")
+f2_syntax <- paste("F2 =~", paste(f2_items, collapse = " + "))
+
+# F3: Market-engagement/Information (new factor)
+f3_items <- c("Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+               "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1",
+               "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous")
+f3_syntax <- paste("F3 =~", paste(f3_items, collapse = " + "))
+
+cfa_model_3f <- c(f1_syntax, f2_syntax, f3_syntax)
+
+# Add factor covariances
+fac_covs_3f <- c("F1 ~~ F2", "F1 ~~ F3", "F2 ~~ F3")
+cfa_model_3f <- c(cfa_model_3f, fac_covs_3f)
+
+# Add the correlated residual from the refined model
+if (any(grepl("Q112.*Q70", cfa_model_refined))) {
+  cfa_model_3f <- c(cfa_model_3f, "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal ~~ Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1")
+}
+
+cfa_model_3f_text <- paste(cfa_model_3f, collapse = "\n")
+cat("Three-factor model syntax:\n")
+cat(cfa_model_3f_text, "\n")
+
+# Fit three-factor model
+fit_cfa_3f <- tryCatch({
+  lavaan::cfa(
+    cfa_model_3f_text,
+    data = cfa_df,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items
+  )
+}, error = function(e) {
+  cat("[ERROR] Three-factor model failed to converge:\n")
+  print(e)
+  return(NULL)
+})
+
+if (!is.null(fit_cfa_3f)) {
+  cat("\nThree-factor model fit indices:\n")
+  print(lavaan::fitMeasures(fit_cfa_3f, c("chisq", "df", "cfi", "rmsea", "srmr")))
+  
+  cat("\nThree-factor standardized loadings:\n")
+  print(lavaan::inspect(fit_cfa_3f, "std")$lambda)
+  
+  # Compare with two-factor model
+  cat("\nModel comparison (2-factor vs 3-factor):\n")
+  fit_2f <- lavaan::fitMeasures(fit_cfa_refined, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  fit_3f <- lavaan::fitMeasures(fit_cfa_3f, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  comparison_df <- data.frame(
+    Model = c("2-Factor", "3-Factor"),
+    ChiSq = c(fit_2f["chisq"], fit_3f["chisq"]),
+    DF = c(fit_2f["df"], fit_3f["df"]),
+    CFI = c(fit_2f["cfi"], fit_3f["cfi"]),
+    RMSEA = c(fit_2f["rmsea"], fit_3f["rmsea"]),
+    SRMR = c(fit_2f["srmr"], fit_3f["srmr"])
+  )
+  print(comparison_df)
+}
+
+# 2b. Test bifactor model
+cat("\n[2b] Testing bifactor model (general F1 + specific info factor)...\n")
+
+# Create bifactor model syntax
+cfa_model_bifactor <- c()
+# General factor (F1)
+general_items <- c("Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
+                   "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous",
+                   "Q0__hope_total__continuous",
+                   "Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous",
+                   "Q5__AgeYears__continuous",
+                   "Q0__self_control_score__continuous",
+                   "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+                   "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1",
+                   "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous")
+general_syntax <- paste("F1 =~", paste(general_items, collapse = " + "))
+
+# Specific information factor (S1)
+specific_items <- c("Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
+                    "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1",
+                    "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous")
+specific_syntax <- paste("S1 =~", paste(specific_items, collapse = " + "))
+
+cfa_model_bifactor <- c(general_syntax, specific_syntax)
+
+# Constrain general and specific factors to be orthogonal
+cfa_model_bifactor <- c(cfa_model_bifactor, "F1 ~~ 0*S1")
+
+# Add correlated residual if needed
+if (any(grepl("Q112.*Q70", cfa_model_refined))) {
+  cfa_model_bifactor <- c(cfa_model_bifactor, "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal ~~ Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1")
+}
+
+cfa_model_bifactor_text <- paste(cfa_model_bifactor, collapse = "\n")
+cat("Bifactor model syntax:\n")
+cat(cfa_model_bifactor_text, "\n")
+
+# Fit bifactor model
+fit_cfa_bifactor <- tryCatch({
+  lavaan::cfa(
+    cfa_model_bifactor_text,
+    data = cfa_df,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items
+  )
+}, error = function(e) {
+  cat("[ERROR] Bifactor model failed to converge:\n")
+  print(e)
+  return(NULL)
+})
+
+if (!is.null(fit_cfa_bifactor)) {
+  cat("\nBifactor model fit indices:\n")
+  print(lavaan::fitMeasures(fit_cfa_bifactor, c("chisq", "df", "cfi", "rmsea", "srmr")))
+  
+  cat("\nBifactor standardized loadings:\n")
+  print(lavaan::inspect(fit_cfa_bifactor, "std")$lambda)
+}
+
+# --- 3. Cross-validation (split-half) ---
+cat("\n[DIAGNOSTIC 3] Cross-validation (Split-half)\n")
+cat(strrep("-", 50), "\n")
+
+# Set seed for reproducible splits
+set.seed(2025)
+
+# Create split-half samples
+n_total <- nrow(cfa_df)
+n_half <- floor(n_total / 2)
+indices <- sample(1:n_total)
+split1_idx <- indices[1:n_half]
+split2_idx <- indices[(n_half + 1):n_total]
+
+split1_data <- cfa_df[split1_idx, ]
+split2_data <- cfa_df[split2_idx, ]
+
+cat("Split-half sample sizes:", nrow(split1_data), "and", nrow(split2_data), "\n")
+
+# Fit models on both splits
+fit_split1 <- tryCatch({
+  lavaan::cfa(
+    cfa_model_refined,
+    data = split1_data,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items
+  )
+}, error = function(e) {
+  cat("[ERROR] Split 1 model failed:\n")
+  print(e)
+  return(NULL)
+})
+
+fit_split2 <- tryCatch({
+  lavaan::cfa(
+    cfa_model_refined,
+    data = split2_data,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items
+  )
+}, error = function(e) {
+  cat("[ERROR] Split 2 model failed:\n")
+  print(e)
+  return(NULL)
+})
+
+if (!is.null(fit_split1) && !is.null(fit_split2)) {
+  # Extract loadings for comparison
+  loadings_split1 <- lavaan::inspect(fit_split1, "std")$lambda
+  loadings_split2 <- lavaan::inspect(fit_split2, "std")$lambda
+  
+  # Focus on Q70 and Q52 loadings
+  q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+  q52_var <- "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous"
+  
+  cat("\nQ70 loading consistency across splits:\n")
+  if (q70_var %in% rownames(loadings_split1) && q70_var %in% rownames(loadings_split2)) {
+    q70_split1 <- loadings_split1[q70_var, ]
+    q70_split2 <- loadings_split2[q70_var, ]
+    cat("Split 1:", round(q70_split1, 3), "\n")
+    cat("Split 2:", round(q70_split2, 3), "\n")
+    cat("Difference:", round(abs(q70_split1 - q70_split2), 3), "\n")
+  }
+  
+  cat("\nQ52 loading consistency across splits:\n")
+  if (q52_var %in% rownames(loadings_split1) && q52_var %in% rownames(loadings_split2)) {
+    q52_split1 <- loadings_split1[q52_var, ]
+    q52_split2 <- loadings_split2[q52_var, ]
+    cat("Split 1:", round(q52_split1, 3), "\n")
+    cat("Split 2:", round(q52_split2, 3), "\n")
+    cat("Difference:", round(abs(q52_split1 - q52_split2), 3), "\n")
+  }
+  
+  # Overall loading stability
+  common_vars <- intersect(rownames(loadings_split1), rownames(loadings_split2))
+  if (length(common_vars) > 0) {
+    loadings_diff <- abs(loadings_split1[common_vars, ] - loadings_split2[common_vars, ])
+    cat("\nMean absolute loading difference across all variables:", round(mean(loadings_diff), 3), "\n")
+    cat("Max absolute loading difference:", round(max(loadings_diff), 3), "\n")
+    
+    # Identify most unstable loadings
+    max_diff_idx <- which(loadings_diff == max(loadings_diff), arr.ind = TRUE)
+    most_unstable_var <- common_vars[max_diff_idx[1, 1]]
+    most_unstable_factor <- colnames(loadings_diff)[max_diff_idx[1, 2]]
+    cat("Most unstable loading:", most_unstable_var, "on", most_unstable_factor, "\n")
+  }
+}
+
+# --- 4. Bootstrap cross-validation ---
+cat("\n[DIAGNOSTIC 4] Bootstrap Cross-validation\n")
+cat(strrep("-", 50), "\n")
+
+B_boot <- 100  # Number of bootstrap samples
+n_cores <- max(1, parallel::detectCores() - 1)
+cl <- makeCluster(n_cores)
+registerDoSNOW(cl)
+
+pb <- txtProgressBar(max = B_boot, style = 3)
+opts <- list(progress = function(n) setTxtProgressBar(pb, n))
+
+boot_loadings <- foreach(b = 1:B_boot, .combine = rbind,
+                         .packages = c("lavaan"),
+                         .options.snow = opts) %dopar% {
+  # Bootstrap sample
+  boot_idx <- sample(nrow(cfa_df), replace = TRUE)
+  boot_data <- cfa_df[boot_idx, ]
+  
+  # Fit model
+  fit_boot <- tryCatch({
+    lavaan::cfa(
+      cfa_model_refined,
+      data = boot_data,
+      std.lv = TRUE,
+      estimator = "WLSMV",
+      ordered = ordered_items
+    )
+  }, error = function(e) NULL)
+  
+  if (is.null(fit_boot)) {
+    return(rep(NA, length(common_vars) * 2))  # 2 factors
+  }
+  
+  # Extract loadings
+  loadings_boot <- lavaan::inspect(fit_boot, "std")$lambda
+  if (length(common_vars) > 0) {
+    loadings_vec <- as.vector(loadings_boot[common_vars, ])
+    return(loadings_vec)
+  } else {
+    return(rep(NA, length(common_vars) * 2))
+  }
+}
+
+close(pb)
+stopCluster(cl)
+
+# Analyze bootstrap results
+if (ncol(boot_loadings) > 0) {
+  # Calculate bootstrap confidence intervals for loadings
+  loadings_ci <- apply(boot_loadings, 2, quantile, c(0.025, 0.975), na.rm = TRUE)
+  
+  # Focus on Q70 and Q52
+  q70_cols <- grep("Q70", colnames(boot_loadings), value = TRUE)
+  q52_cols <- grep("Q52", colnames(boot_loadings), value = TRUE)
+  
+  cat("\nQ70 bootstrap confidence intervals:\n")
+  if (length(q70_cols) > 0) {
+    for (col in q70_cols) {
+      ci <- loadings_ci[, col]
+      cat(col, ":", round(ci[1], 3), "to", round(ci[2], 3), "\n")
+    }
+  }
+  
+  cat("\nQ52 bootstrap confidence intervals:\n")
+  if (length(q52_cols) > 0) {
+    for (col in q52_cols) {
+      ci <- loadings_ci[, col]
+      cat(col, ":", round(ci[1], 3), "to", round(ci[2], 3), "\n")
+    }
+  }
+}
+
+# --- 5. Check Parameter Uncertainty ---
+cat("\n[DIAGNOSTIC 5] Parameter Uncertainty Analysis\n")
+cat(strrep("-", 50), "\n")
+
+# Extract standard errors and parameter estimates
+par_table_full <- lavaan::parTable(fit_cfa_refined)
+par_table_full$se_ratio <- abs(par_table_full$est / par_table_full$se)
+
+# Focus on loadings and thresholds
+loadings_table <- subset(par_table_full, op == "=~")
+thresholds_table <- subset(par_table_full, op == "|")
+
+cat("\nLoadings with large standard errors (SE ratio > 2):\n")
+large_se_loadings <- subset(loadings_table, se_ratio < 0.5)
+if (nrow(large_se_loadings) > 0) {
+  print(large_se_loadings[, c("lhs", "rhs", "est", "se", "se_ratio")])
+} else {
+  cat("No loadings with unusually large SEs detected.\n")
+}
+
+cat("\nThresholds with large standard errors (SE ratio > 2):\n")
+large_se_thresholds <- subset(thresholds_table, se_ratio < 0.5)
+if (nrow(large_se_thresholds) > 0) {
+  print(large_se_thresholds[, c("lhs", "rhs", "est", "se", "se_ratio")])
+} else {
+  cat("No thresholds with unusually large SEs detected.\n")
+}
+
+# Check for category imbalances in ordered variables
+cat("\n[5b] Category distribution analysis for ordered variables:\n")
+for (var in ordered_items) {
+  if (var %in% names(cfa_df)) {
+    tab <- table(cfa_df[[var]], useNA = "ifany")
+    cat("\n", var, ":\n")
+    print(tab)
+    cat("Proportions:\n")
+    print(round(prop.table(tab), 3))
+    
+    # Check for sparse categories
+    sparse <- tab[tab < 5]
+    if (length(sparse) > 0) {
+      cat("Sparse categories (< 5 observations):\n")
+      print(sparse)
+      cat("Consider merging these levels.\n")
+    }
+  }
+}
+
+# --- 6. Summary and Recommendations ---
+cat("\n[DIAGNOSTIC 6] Summary and Recommendations\n")
+cat(strrep("-", 50), "\n")
+
+cat("\nKey Findings:\n")
+cat("1. Q70 Heywood case:", ifelse(nrow(q70_neg_resid) > 0, "DETECTED", "NOT DETECTED"), "\n")
+cat("2. Three-factor model fit:", ifelse(!is.null(fit_cfa_3f), "SUCCESSFUL", "FAILED"), "\n")
+cat("3. Bifactor model fit:", ifelse(!is.null(fit_cfa_bifactor), "SUCCESSFUL", "FAILED"), "\n")
+cat("4. Cross-validation:", ifelse(!is.null(fit_split1) && !is.null(fit_split2), "COMPLETED", "FAILED"), "\n")
+
+cat("\nRecommendations:\n")
+if (nrow(q70_neg_resid) > 0) {
+  cat("- Fix Q70 residual variance to 0.01 or consider dropping Q70\n")
+  cat("- Examine Q70 category distribution for sparse categories\n")
+}
+
+if (!is.null(fit_cfa_3f) && !is.null(fit_cfa_bifactor)) {
+  # Compare model fits
+  fit_2f <- lavaan::fitMeasures(fit_cfa_refined, c("cfi", "rmsea", "srmr"))
+  fit_3f <- lavaan::fitMeasures(fit_cfa_3f, c("cfi", "rmsea", "srmr"))
+  fit_bif <- lavaan::fitMeasures(fit_cfa_bifactor, c("cfi", "rmsea", "srmr"))
+  
+  models <- data.frame(
+    Model = c("2-Factor", "3-Factor", "Bifactor"),
+    CFI = c(fit_2f["cfi"], fit_3f["cfi"], fit_bif["cfi"]),
+    RMSEA = c(fit_2f["rmsea"], fit_3f["rmsea"], fit_bif["rmsea"]),
+    SRMR = c(fit_2f["srmr"], fit_3f["srmr"], fit_bif["srmr"])
+  )
+  
+  best_model <- models$Model[which.max(models$CFI)]
+  cat("- Best fitting model:", best_model, "\n")
+  
+  if (best_model == "3-Factor") {
+    cat("- Consider the three-factor solution with dedicated Market-engagement factor\n")
+  } else if (best_model == "Bifactor") {
+    cat("- Consider the bifactor solution with general + specific factors\n")
+  }
+}
+
+if (length(large_se_loadings) > 0 || length(large_se_thresholds) > 0) {
+  cat("- Large standard errors detected; consider merging sparse categories\n")
+}
+
+cat("\nNext Steps:\n")
+cat("1. Implement the recommended model modifications\n")
+cat("2. Re-run diagnostics on the modified model\n")
+cat("3. Validate the final solution with additional data if available\n")
+
+# Save diagnostic results
+saveRDS(list(
+  fit_cfa_refined = fit_cfa_refined,
+  fit_cfa_3f = fit_cfa_3f,
+  fit_cfa_bifactor = fit_cfa_bifactor,
+  fit_split1 = fit_split1,
+  fit_split2 = fit_split2,
+  boot_loadings = boot_loadings,
+  par_table_full = par_table_full
+), file = "cfa_diagnostics.rds")
+
+cat("\nDiagnostic results saved to 'cfa_diagnostics.rds'\n")
+
