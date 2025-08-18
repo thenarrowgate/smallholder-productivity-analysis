@@ -14,6 +14,7 @@ library(EFAtools)    # VSS(), tenBerge scores
 library(boot)        # bootstrap()
 library(Gifi)        # princals()
 library(lavaan)      # sem()
+library(semTools)    # indProd() for latent interactions
 library(mgcv)        # gam()
 library(mgcViz)      # diagnostic tools for mgcv::gam
 library(polycor)     # hetcor()
@@ -2994,3 +2995,166 @@ cat("\n", strrep("=", 80), "\n")
 cat("FINAL MEASUREMENT CORE REPORT COMPLETE\n")
 cat(strrep("=", 80), "\n")
 
+# ---------------------------------------------------------------------------
+# 21. Confirmatory factor analysis and SEM
+# ---------------------------------------------------------------------------
+# Use the pruned loading matrix ``Lambda0`` to build a lavaan model
+# where each variable loads only on its primary factor.  The structural
+# part regresses the productivity index on the two latent factors and
+# their interaction, reflecting the synergy observed in the GAM phase.
+
+# --- 21.1  Assemble measurement model from primary loadings ---------------
+prim_fac <- apply(abs(Lambda0), 1, function(row)
+  colnames(Lambda0)[which.max(row)])
+items_by_fac <- split(names(prim_fac), prim_fac)
+meas_lines <- vapply(names(items_by_fac), function(f)
+  paste0(f, " =~ ", paste(items_by_fac[[f]], collapse = " + ")),
+  character(1))
+
+# --- 21.2  Build full SEM specification ----------------------------------
+# Create product indicators so the latent interaction F1 × F2 can be modelled
+# (lavaan does not directly support the ":" operator for latent factors).
+df_sem <- df_mix2_clean[, keep_final, drop = FALSE]
+df_sem$prod_index <- y_prod
+
+ordered_vars <- names(df_sem)[sapply(df_sem, is.ordered)]
+
+# Build product indicators via semTools (needs numeric columns)
+prod_base <- df_sem
+prod_base[ordered_vars] <- lapply(prod_base[ordered_vars], as.numeric)
+num_cols_all <- names(prod_base)[sapply(prod_base, is.numeric)]
+prod_base[num_cols_all] <- scale(prod_base[num_cols_all])
+nprod <- length(items_by_fac[["F1"]]) * length(items_by_fac[["F2"]])
+prod_names <- paste0("F1F2_", seq_len(nprod))
+df_sem <- semTools::indProd(
+  data   = prod_base,
+  var1   = items_by_fac[["F1"]],
+  var2   = items_by_fac[["F2"]],
+  match  = FALSE,
+  meanC  = TRUE,
+  namesProd = prod_names
+)
+int_indicators <- setdiff(colnames(df_sem), colnames(prod_base))
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
+
+# Measurement model including the interaction factor
+meas_int_lines <- c(
+  meas_lines,
+  paste0("F1F2 =~ ", paste(int_indicators, collapse = " + "))
+)
+
+# Full SEM specification with the latent interaction factor regressing prod_index
+sem_lines <- c(meas_int_lines,
+               "prod_index ~ F1 + F2 + F1F2")
+sem_model <- paste(sem_lines, collapse = "\n")
+cat("\nSEM model specification:\n", sem_model, "\n")
+
+# --- 21.3  Fit CFA model --------------------------------------------------
+fit_cfa <- lavaan::cfa(paste(meas_int_lines, collapse = "\n"),
+                       data    = df_sem,
+                       ordered = ordered_vars,
+                       std.lv  = TRUE)
+cat("\n--- CFA summary ---\n")
+print(summary(fit_cfa, fit.measures = TRUE, standardized = TRUE))
+
+# --- 21.5  Fit SEM with latent interaction -------------------------------
+fit_sem <- lavaan::sem(sem_model,
+                       data    = df_sem,
+                       ordered = ordered_vars,
+                       std.lv  = TRUE)
+cat("\n--- SEM summary ---\n")
+print(summary(fit_sem, fit.measures = TRUE, standardized = TRUE))
+
+
+# TESTING -------------------------------------------------------
+
+# ──────────────────────────────────────────────────────────────────────
+#  SEM: curvature (F1_parcl2) + latent interaction (F1F2) + Seedlings
+# ──────────────────────────────────────────────────────────────────────
+library(dplyr)
+library(semTools)
+library(lavaan)
+
+## --------------------------------------------------------------------
+## 0.  Base data frame with manifest indicators + outcome
+## --------------------------------------------------------------------
+df_sem <- df_mix2_clean[, keep_final, drop = FALSE]   # pruned indicators
+df_sem$prod_index <- y_prod                           # outcome
+
+## --------------------------------------------------------------------
+## 1.  Seedlings 0/1 dummy  (re-attach from the raw Excel frame `df`)
+## --------------------------------------------------------------------
+seed_var <- grep("^Q56__For_vegetables_do_you_use_seedlings",
+                 names(df), value = TRUE)
+if (length(seed_var) != 1)
+  stop("❌  Seedlings column not found - check Excel headers.")
+
+df_sem$Seedlings <- +(df[[seed_var]] != "Own_seed")   # 1 = bought/other
+
+## --------------------------------------------------------------------
+## 2.  Quadratic parcel of F1  (captures sigmoid curvature)
+## --------------------------------------------------------------------
+f1_inds        <- items_by_fac[["F1"]]                # vector of F1 indicators
+f1_num_matrix  <- scale(data.matrix(df_sem[ , f1_inds]))   # numeric + z-score
+df_sem$F1_parcl2 <- scale(rowMeans(f1_num_matrix^2),
+                          center = TRUE, scale = TRUE)[,1]
+
+## --------------------------------------------------------------------
+## 3.  Product indicators for latent interaction  F1 × F2
+## --------------------------------------------------------------------
+tmp_num <- df_sem
+tmp_num[ordered_vars] <- lapply(tmp_num[ordered_vars], as.numeric)  # numeric copy
+num_idx <- sapply(tmp_num, is.numeric)
+tmp_num[num_idx] <- scale(tmp_num[num_idx])                         # mean-centre
+
+prod_names <- paste0("F1F2_", seq_len(length(items_by_fac[["F1"]]) *
+                                        length(items_by_fac[["F2"]])))
+
+df_sem <- indProd(
+  data       = tmp_num,
+  var1       = items_by_fac[["F1"]],
+  var2       = items_by_fac[["F2"]],
+  match      = FALSE,
+  meanC      = TRUE,
+  namesProd  = prod_names
+)
+
+##  restore ordered factors (indProd() coerced them to numeric)
+df_sem[ordered_vars] <- lapply(df_sem[ordered_vars], ordered)
+
+## --------------------------------------------------------------------
+## 4.  SEM syntax
+## --------------------------------------------------------------------
+# measurement blocks
+meas_lines <- vapply(names(items_by_fac), function(f)
+  paste0(f, " =~ ", paste(items_by_fac[[f]], collapse = " + ")),
+  character(1))
+
+sem_lines <- c(
+  meas_lines,
+  paste0("F1F2 =~ ", paste(prod_names, collapse = " + ")),
+  "prod_index ~ b1*F1 + b2*F1_parcl2 + b3*F2 + b4*F1F2",
+  # optional mediation path (uncomment if you want to test it)
+  # "F1 ~ m1*F2",
+  # free residual covariance flagged in diagnostics
+  "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1 ~~ Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous"
+)
+
+sem_quad <- paste(sem_lines, collapse = "\n")
+
+cat(sem_quad)
+## --------------------------------------------------------------------
+## 5.  Fit the model (DWLS handles ordered indicators nicely)
+## --------------------------------------------------------------------
+fit_quad <- sem(
+  sem_quad,
+  data      = df_sem,
+  ordered   = ordered_vars,
+  estimator = "DWLS",
+  std.lv    = TRUE
+)
+
+## --------------------------------------------------------------------
+## 6.  Inspect the results
+## --------------------------------------------------------------------
+summary(fit_quad, fit.measures = TRUE, standardized = TRUE)
