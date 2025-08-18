@@ -300,7 +300,7 @@ df_psi_ci <- data.frame(
 # Variables with unstable or weak loadings are removed to improve factor
 # interpretability.  Primary loadings are defined along with their
 # bootstrapped confidence intervals.
-#   12.1 Identify each variable’s primary loading & its 95% CI
+#   12.1 Identify each variable's primary loading & its 95% CI
 prim_list <- lapply(vars, function(v) {
   tmp <- df_L_ci[df_L_ci$variable==v, ]
   loads <- L_median[v,]; fidx <- which.max(abs(loads))
@@ -678,7 +678,7 @@ W_B     <- Psi_inv %*% Lambda0 %*% solve(middle)   # (p × k)
 F_hat <- X_std %*% W_B
 
 # 6.  Keep the same labels so downstream code is unchanged
-colnames(F_hat) <- colnames(Lambda0)   # “F1”, “F2”, …
+colnames(F_hat) <- colnames(Lambda0)   # "F1", "F2", …
 rownames(F_hat) <- rownames(df_mix2_clean)
 
 # --- 20a.4 Review factor correlations -------------------------------------
@@ -1388,7 +1388,7 @@ if (nrow(high_mi_final) > 0) {
 }
 
 # ---------------------------------------------------------------------------
-# 23. Advanced Diagnostic Checks and Model Refinements
+# 22. Advanced Diagnostic Checks and Model Refinements
 # ---------------------------------------------------------------------------
 
 cat("\n", strrep("=", 80), "\n")
@@ -1867,4 +1867,400 @@ saveRDS(list(
 ), file = "cfa_diagnostics.rds")
 
 cat("\nDiagnostic results saved to 'cfa_diagnostics.rds'\n")
+
+# ---------------------------------------------------------------------------
+# 23. Final Model Refinements and Lock-in
+# ---------------------------------------------------------------------------
+
+cat("\n", strrep("=", 80), "\n")
+cat("FINAL MODEL REFINEMENTS AND LOCK-IN\n")
+cat(strrep("=", 80), "\n")
+
+# --- 1. Lock-in the fixed-error 2-factor model as measurement core ---
+cat("\n[FINAL 1] Locking in fixed-error 2-factor model\n")
+cat(strrep("-", 50), "\n")
+
+# Use the fixed model if it was successful, otherwise use the refined model
+if (exists("fit_cfa_fixed") && !is.null(fit_cfa_fixed)) {
+  fit_cfa_final <- fit_cfa_fixed
+  cfa_model_final <- cfa_model_fixed
+  cat("Using fixed-error model (Q70 residual variance = 0.01)\n")
+} else {
+  fit_cfa_final <- fit_cfa_refined
+  cfa_model_final <- cfa_model_refined
+  cat("Using refined model (no Heywood case detected)\n")
+}
+
+cat("Final model fit indices:\n")
+print(lavaan::fitMeasures(fit_cfa_final, c("chisq", "df", "cfi", "rmsea", "srmr")))
+
+# --- 2a. Test Q70+Q108 composite as F1 indicator ---
+cat("\n[FINAL 2a] Testing Q70+Q108 composite as F1 indicator\n")
+cat(strrep("-", 50), "\n")
+
+# Create composite variable
+q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+q108_var <- "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous"
+
+if (q70_var %in% names(cfa_df) && q108_var %in% names(cfa_df)) {
+  # Standardize both variables
+  q70_std <- scale(as.numeric(cfa_df[[q70_var]]))
+  q108_std <- scale(cfa_df[[q108_var]])
+  
+  # Create composite (simple average of standardized scores)
+  composite_70_108 <- (q70_std + q108_std) / 2
+  cfa_df$Q70_Q108_composite <- composite_70_108
+  
+  cat("Created Q70+Q108 composite variable\n")
+  cat("Correlation between Q70 and Q108:", round(cor(q70_std, q108_std, use = "complete.obs"), 3), "\n")
+  cat("Composite variable statistics:\n")
+  print(summary(cfa_df$Q70_Q108_composite))
+  
+  # Create composite model by adding composite to F1
+  # Split the model string into lines
+  model_lines <- strsplit(cfa_model_final, "\n")[[1]]
+  
+  # Find the F1 line
+  f1_line_idx <- which(grepl("^F1 =~", model_lines))
+  if (length(f1_line_idx) > 0) {
+    # Get the current F1 line
+    current_f1_line <- model_lines[f1_line_idx[1]]
+    
+    # Add the composite to the F1 line
+    new_f1_line <- paste0(current_f1_line, " + Q70_Q108_composite")
+    
+    # Replace the F1 line
+    model_lines[f1_line_idx[1]] <- new_f1_line
+    
+    # Reconstruct the model string
+    cfa_model_composite <- paste(model_lines, collapse = "\n")
+  } else {
+    cfa_model_composite <- cfa_model_final
+  }
+  
+  cfa_model_composite_text <- paste(cfa_model_composite, collapse = "\n")
+  cat("Composite model syntax:\n")
+  cat(paste(cfa_model_composite, collapse = "\n"), "\n")
+  
+  # Fit composite model
+  fit_cfa_composite <- tryCatch({
+    lavaan::cfa(
+      cfa_model_composite_text,
+      data = cfa_df,
+      std.lv = TRUE,
+      estimator = "WLSMV",
+      ordered = ordered_items
+    )
+  }, error = function(e) {
+    cat("[ERROR] Composite model failed to converge:\n")
+    print(e)
+    return(NULL)
+  })
+  
+  if (!is.null(fit_cfa_composite)) {
+    cat("\nComposite model fit indices:\n")
+    print(lavaan::fitMeasures(fit_cfa_composite, c("chisq", "df", "cfi", "rmsea", "srmr")))
+    
+    cat("\nComposite model standardized loadings:\n")
+    print(lavaan::inspect(fit_cfa_composite, "std")$lambda)
+    
+    # Compare with original model
+    cat("\nModel comparison (Original vs Composite):\n")
+    fit_orig <- lavaan::fitMeasures(fit_cfa_final, c("chisq", "df", "cfi", "rmsea", "srmr"))
+    fit_comp <- lavaan::fitMeasures(fit_cfa_composite, c("chisq", "df", "cfi", "rmsea", "srmr"))
+    comparison_df <- data.frame(
+      Model = c("Original", "Composite"),
+      ChiSq = c(fit_orig["chisq"], fit_comp["chisq"]),
+      DF = c(fit_orig["df"], fit_comp["df"]),
+      CFI = c(fit_orig["cfi"], fit_comp["cfi"]),
+      RMSEA = c(fit_orig["rmsea"], fit_comp["rmsea"]),
+      SRMR = c(fit_orig["srmr"], fit_comp["srmr"])
+    )
+    print(comparison_df)
+  }
+} else {
+  cat("Q70 or Q108 variables not found in dataset\n")
+}
+
+# --- 2b. Collapse sparse ordinal categories ---
+cat("\n[FINAL 2b] Collapsing sparse ordinal categories\n")
+cat(strrep("-", 50), "\n")
+
+# Function to collapse sparse categories
+collapse_sparse_categories <- function(data, var_name, min_count = 5) {
+  if (!var_name %in% names(data)) return(data)
+  
+  var_data <- data[[var_name]]
+  if (!is.factor(var_data) && !is.ordered(var_data)) return(data)
+  
+  tab <- table(var_data, useNA = "ifany")
+  sparse_levels <- names(tab)[tab < min_count]
+  
+  if (length(sparse_levels) > 0) {
+    cat("Collapsing sparse categories in", var_name, ":\n")
+    cat("Original levels:", paste(levels(var_data), collapse = ", "), "\n")
+    cat("Sparse levels (<", min_count, "):", paste(sparse_levels, collapse = ", "), "\n")
+    
+    # Create new factor with collapsed levels
+    new_data <- as.character(var_data)
+    
+    # For ordinal variables, collapse from the extremes
+    if (is.ordered(var_data)) {
+      levels_numeric <- as.numeric(levels(var_data))
+      if (length(levels_numeric) >= 4) {
+        # Collapse extreme categories: 1+2 vs 3 vs 4+5
+        new_data[new_data %in% c("1", "2")] <- "1-2"
+        new_data[new_data %in% c("4", "5")] <- "4-5"
+        new_levels <- c("1-2", "3", "4-5")
+      } else {
+        # For shorter scales, just combine adjacent sparse levels
+        for (level in sparse_levels) {
+          if (level %in% names(tab)) {
+            # Find adjacent level to combine with
+            level_num <- as.numeric(level)
+            if (level_num > 1) {
+              new_data[new_data == level] <- as.character(level_num - 1)
+            } else {
+              new_data[new_data == level] <- as.character(level_num + 1)
+            }
+          }
+        }
+        new_levels <- sort(unique(new_data))
+      }
+    } else {
+      # For nominal variables, combine sparse levels into "Other"
+      for (level in sparse_levels) {
+        new_data[new_data == level] <- "Other"
+      }
+      new_levels <- c(setdiff(levels(var_data), sparse_levels), "Other")
+    }
+    
+    data[[var_name]] <- factor(new_data, levels = new_levels, ordered = is.ordered(var_data))
+    cat("New levels:", paste(levels(data[[var_name]]), collapse = ", "), "\n")
+  } else {
+    cat("No sparse categories found in", var_name, "\n")
+  }
+  
+  return(data)
+}
+
+# Apply collapsing to ordered variables
+cfa_df_collapsed <- cfa_df
+for (var in ordered_items) {
+  cfa_df_collapsed <- collapse_sparse_categories(cfa_df_collapsed, var, min_count = 5)
+}
+
+# Update ordered_items list for collapsed data
+ordered_items_collapsed <- names(Filter(is.ordered, cfa_df_collapsed))
+
+cat("\nUpdated ordered variables after collapsing:\n")
+print(ordered_items_collapsed)
+
+# Fit model with collapsed categories (including composite)
+fit_cfa_collapsed <- tryCatch({
+  lavaan::cfa(
+    cfa_model_composite,
+    data = cfa_df_collapsed,
+    std.lv = TRUE,
+    estimator = "WLSMV",
+    ordered = ordered_items_collapsed
+  )
+}, error = function(e) {
+  cat("[ERROR] Collapsed model failed to converge:\n")
+  print(e)
+  return(NULL)
+})
+
+if (!is.null(fit_cfa_collapsed)) {
+  cat("\nCollapsed model fit indices:\n")
+  print(lavaan::fitMeasures(fit_cfa_collapsed, c("chisq", "df", "cfi", "rmsea", "srmr")))
+  
+  cat("\nCollapsed model standardized loadings:\n")
+  print(lavaan::inspect(fit_cfa_collapsed, "std")$lambda)
+  
+  # Compare with composite model
+  cat("\nModel comparison (Composite vs Collapsed):\n")
+  fit_orig <- lavaan::fitMeasures(fit_cfa_composite, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  fit_coll <- lavaan::fitMeasures(fit_cfa_collapsed, c("chisq", "df", "cfi", "rmsea", "srmr"))
+  comparison_df <- data.frame(
+    Model = c("Composite", "Collapsed"),
+    ChiSq = c(fit_orig["chisq"], fit_coll["chisq"]),
+    DF = c(fit_orig["df"], fit_coll["df"]),
+    CFI = c(fit_orig["cfi"], fit_coll["cfi"]),
+    RMSEA = c(fit_orig["rmsea"], fit_coll["rmsea"]),
+    SRMR = c(fit_orig["srmr"], fit_coll["srmr"])
+  )
+  print(comparison_df)
+}
+
+# --- 2c. Re-run bootstrap with interpretable CIs ---
+cat("\n[FINAL 2c] Re-running bootstrap with interpretable CIs\n")
+cat(strrep("-", 50), "\n")
+
+# Choose the best model for bootstrap (collapsed if successful, otherwise composite)
+if (!is.null(fit_cfa_collapsed)) {
+  bootstrap_data <- cfa_df_collapsed
+  bootstrap_model <- cfa_model_composite
+  bootstrap_ordered <- ordered_items_collapsed
+  cat("Using collapsed model for bootstrap\n")
+} else {
+  bootstrap_data <- cfa_df
+  bootstrap_model <- cfa_model_composite
+  bootstrap_ordered <- ordered_items
+  cat("Using composite model for bootstrap\n")
+}
+
+# Bootstrap with proper variable name handling
+B_boot_final <- 200  # Increased sample size for better precision
+n_cores <- max(1, parallel::detectCores() - 1)
+cl <- makeCluster(n_cores)
+registerDoSNOW(cl)
+
+pb <- txtProgressBar(max = B_boot_final, style = 3)
+opts <- list(progress = function(n) setTxtProgressBar(pb, n))
+
+boot_loadings_final <- foreach(b = 1:B_boot_final, .combine = rbind,
+                              .packages = c("lavaan"),
+                              .options.snow = opts) %dopar% {
+  # Bootstrap sample
+  boot_idx <- sample(nrow(bootstrap_data), replace = TRUE)
+  boot_data <- bootstrap_data[boot_idx, ]
+  
+  # Fit model
+  fit_boot <- tryCatch({
+    lavaan::cfa(
+      bootstrap_model,
+      data = boot_data,
+      std.lv = TRUE,
+      estimator = "WLSMV",
+      ordered = bootstrap_ordered
+    )
+  }, error = function(e) NULL)
+  
+  if (is.null(fit_boot)) {
+    return(rep(NA, 20))  # Adjust based on expected number of loadings
+  }
+  
+  # Extract loadings
+  loadings_boot <- lavaan::inspect(fit_boot, "std")$lambda
+  loadings_vec <- as.vector(loadings_boot)
+  names(loadings_vec) <- paste0("loading_", 1:length(loadings_vec))
+  return(loadings_vec)
+}
+
+close(pb)
+stopCluster(cl)
+
+# Analyze bootstrap results
+cat("\nBootstrap convergence rate:", round(sum(!is.na(boot_loadings_final[, 1])) / B_boot_final * 100, 1), "%\n")
+
+if (sum(!is.na(boot_loadings_final[, 1])) >= 0.95 * B_boot_final) {
+  cat("✓ Bootstrap convergence ≥95% - results are reliable\n")
+  
+  # Calculate bootstrap confidence intervals
+  loadings_ci_final <- apply(boot_loadings_final, 2, quantile, c(0.025, 0.975), na.rm = TRUE)
+  
+  # Extract original loading names for interpretation
+  orig_loadings <- lavaan::inspect(fit_cfa_final, "std")$lambda
+  loading_names <- paste0(rep(rownames(orig_loadings), each = ncol(orig_loadings)), 
+                         "_", rep(colnames(orig_loadings), times = nrow(orig_loadings)))
+  
+  # Focus on key variables
+  key_vars <- c("Q70", "Q52", "Q112", "Q62", "Q108", "Q109", "Q5")
+  
+  cat("\nBootstrap confidence intervals for key variables:\n")
+  for (var in key_vars) {
+    var_cols <- grep(var, colnames(boot_loadings_final), value = TRUE)
+    if (length(var_cols) > 0) {
+      cat("\n", var, ":\n")
+      for (col in var_cols) {
+        ci <- loadings_ci_final[, col]
+        if (!all(is.na(ci))) {
+          cat("  ", col, ":", round(ci[1], 3), "to", round(ci[2], 3), "\n")
+        }
+      }
+    }
+  }
+  
+  # Overall loading stability
+  loadings_sd <- apply(boot_loadings_final, 2, sd, na.rm = TRUE)
+  cat("\nLoading stability (standard deviations):\n")
+  print(round(loadings_sd, 3))
+  
+  # Identify most unstable loadings
+  max_sd_idx <- which.max(loadings_sd)
+  cat("\nMost unstable loading:", names(loadings_sd)[max_sd_idx], 
+      "(SD =", round(loadings_sd[max_sd_idx], 3), ")\n")
+  
+} else {
+  cat("✗ Bootstrap convergence <95% - results may be unreliable\n")
+}
+
+# --- 3. Final model summary and recommendations ---
+cat("\n[FINAL 3] Summary and Final Recommendations\n")
+cat(strrep("-", 50), "\n")
+
+cat("\nFinal Model Status:\n")
+cat("1. Fixed-error 2-factor model:", ifelse(exists("fit_cfa_fixed") && !is.null(fit_cfa_fixed), "IMPLEMENTED", "NOT NEEDED"), "\n")
+cat("2. Q70+Q108 composite test:", ifelse(exists("fit_cfa_composite") && !is.null(fit_cfa_composite), "COMPLETED", "FAILED"), "\n")
+cat("3. Category collapsing:", ifelse(exists("fit_cfa_collapsed") && !is.null(fit_cfa_collapsed), "COMPLETED", "FAILED"), "\n")
+cat("4. Bootstrap CIs:", ifelse(sum(!is.na(boot_loadings_final[, 1])) >= 0.95 * B_boot_final, "RELIABLE", "UNRELIABLE"), "\n")
+
+# Determine the best final model
+best_model <- "original"
+best_fit <- lavaan::fitMeasures(fit_cfa_final, c("cfi", "rmsea", "srmr"))
+
+if (exists("fit_cfa_composite") && !is.null(fit_cfa_composite)) {
+  comp_fit <- lavaan::fitMeasures(fit_cfa_composite, c("cfi", "rmsea", "srmr"))
+  if (comp_fit["cfi"] > best_fit["cfi"] && comp_fit["rmsea"] < best_fit["rmsea"]) {
+    best_model <- "composite"
+    best_fit <- comp_fit
+  }
+}
+
+if (exists("fit_cfa_collapsed") && !is.null(fit_cfa_collapsed)) {
+  coll_fit <- lavaan::fitMeasures(fit_cfa_collapsed, c("cfi", "rmsea", "srmr"))
+  if (coll_fit["cfi"] > best_fit["cfi"] && coll_fit["rmsea"] < best_fit["rmsea"]) {
+    best_model <- "collapsed"
+    best_fit <- coll_fit
+  }
+}
+
+cat("\nBest final model:", best_model, "\n")
+cat("Best fit indices: CFI =", round(best_fit["cfi"], 3), 
+    ", RMSEA =", round(best_fit["rmsea"], 3), 
+    ", SRMR =", round(best_fit["srmr"], 3), "\n")
+
+cat("\nFinal Recommendations:\n")
+if (best_model == "composite") {
+  cat("- Use the Q70+Q108 composite model for cleaner interpretation\n")
+  cat("- The composite captures both information-seeking and agricultural income\n")
+} else if (best_model == "collapsed") {
+  cat("- Use the collapsed categories model for better threshold estimation\n")
+  cat("- Consider the composite approach for future data collection\n")
+} else {
+  cat("- Keep the original fixed-error model as the final solution\n")
+  cat("- Consider the composite approach for future studies\n")
+}
+
+if (sum(!is.na(boot_loadings_final[, 1])) >= 0.95 * B_boot_final) {
+  cat("- Bootstrap results are reliable for confidence intervals\n")
+} else {
+  cat("- Bootstrap convergence is poor; interpret with caution\n")
+}
+
+# Save final results
+saveRDS(list(
+  fit_cfa_final = fit_cfa_final,
+  fit_cfa_composite = if(exists("fit_cfa_composite")) fit_cfa_composite else NULL,
+  fit_cfa_collapsed = if(exists("fit_cfa_collapsed")) fit_cfa_collapsed else NULL,
+  boot_loadings_final = boot_loadings_final,
+  best_model = best_model,
+  best_fit = best_fit
+), file = "cfa_final_model.rds")
+
+cat("\nFinal model results saved to 'cfa_final_model.rds'\n")
+cat("\n", strrep("=", 80), "\n")
+cat("FINAL MODEL REFINEMENTS COMPLETE\n")
+cat(strrep("=", 80), "\n")
 
