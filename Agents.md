@@ -26,5 +26,4 @@ samples with replacement, and the final loadings / unique variances are the medi
 
 Current sub-goal in the project pipe-line:
 
-As of now, the current goal is to get a stable factor solution (Tucker's phi >= 0.90 and Hancock's H >= 0.80 for all factors).
-
+Resolve all issues with the CFA and move the CFA to be right after the EFA and see if the GAM analysis is necessary if we anyways will do SEM later
