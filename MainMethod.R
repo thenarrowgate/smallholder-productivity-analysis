@@ -2264,3 +2264,468 @@ cat("\n", strrep("=", 80), "\n")
 cat("FINAL MODEL REFINEMENTS COMPLETE\n")
 cat(strrep("=", 80), "\n")
 
+# ---------------------------------------------------------------------------
+# 24. Additional Diagnostic Checks for Specific Issues
+# ---------------------------------------------------------------------------
+
+cat("\n", strrep("=", 80), "\n")
+cat("ADDITIONAL DIAGNOSTIC CHECKS FOR SPECIFIC ISSUES\n")
+cat(strrep("=", 80), "\n")
+
+# --- Issue 1: Enforce Simple Structure (Drop Q70 Cross-loading on F2) ---
+cat("\n[ISSUE 1] Enforcing Simple Structure - Drop Q70 Cross-loading on F2\n")
+cat(strrep("-", 60), "\n")
+
+# First, let's check the current model to see Q70's loadings
+if (exists("fit_cfa_final") && !is.null(fit_cfa_final)) {
+  current_loadings <- lavaan::inspect(fit_cfa_final, "std")$lambda
+  q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+  
+  if (q70_var %in% rownames(current_loadings)) {
+    cat("Current Q70 loadings:\n")
+    print(round(current_loadings[q70_var, ], 3))
+    
+    # Check if Q70 has significant cross-loading on F2
+    q70_f2_loading <- current_loadings[q70_var, "F2"]
+    if (abs(q70_f2_loading) > 0.3) {
+      cat("\nQ70 has substantial cross-loading on F2 (", round(q70_f2_loading, 3), ")\n")
+      cat("Creating simple structure model by constraining Q70 to load only on F1...\n")
+      
+      # Create simple structure model by properly removing Q70 from F2
+      # Parse the current model and modify factor loadings
+      model_lines <- strsplit(cfa_model_final, "\n")[[1]]
+      
+      # Find F1 and F2 lines
+      f1_line_idx <- which(grepl("^F1 =~", model_lines))
+      f2_line_idx <- which(grepl("^F2 =~", model_lines))
+      
+      if (length(f1_line_idx) > 0 && length(f2_line_idx) > 0) {
+        # Get current F1 and F2 lines
+        f1_line <- model_lines[f1_line_idx[1]]
+        f2_line <- model_lines[f2_line_idx[1]]
+        
+        # Remove Q70 from F2 line if present
+        # Use fixed=TRUE to avoid regex issues with special characters
+        q70_patterns <- c(
+          paste0(" + ", q70_var),
+          paste0("+ ", q70_var),
+          paste0(" +", q70_var),
+          paste0(q70_var, " +"),
+          paste0(q70_var, "+"),
+          q70_var
+        )
+        
+        f2_line_new <- f2_line
+        for (pattern in q70_patterns) {
+          f2_line_new <- gsub(pattern, "", f2_line_new, fixed = TRUE)
+        }
+        
+        # Clean up any remaining artifacts
+        f2_line_new <- gsub("\\s+", " ", f2_line_new)  # Multiple spaces to single
+        f2_line_new <- gsub("\\s*\\+\\s*\\+\\s*", " + ", f2_line_new)  # Multiple + signs
+        f2_line_new <- gsub("\\s*\\+\\s*$", "", f2_line_new)  # Trailing +
+        f2_line_new <- gsub("\\s+$", "", f2_line_new)  # Trailing spaces
+        
+        # If F2 line becomes empty except for "F2 =~", handle it
+        if (grepl("^F2\\s*=~\\s*$", f2_line_new)) {
+          f2_line_new <- "F2 =~"
+        }
+        
+        # Replace the F2 line
+        model_lines[f2_line_idx[1]] <- f2_line_new
+        
+        # Ensure Q70 is in F1 if not already there
+        if (!grepl(q70_var, f1_line, fixed = TRUE)) {
+          f1_line_new <- paste0(f1_line, " + ", q70_var)
+          model_lines[f1_line_idx[1]] <- f1_line_new
+        }
+        
+        # Reconstruct the model
+        cfa_model_simple <- paste(model_lines, collapse = "\n")
+      } else {
+        cat("Warning: Could not find F1 or F2 lines in model syntax\n")
+        cfa_model_simple <- cfa_model_final
+      }
+      
+      cat("\nSimple structure model syntax (with Q70 constrained to F1 only):\n")
+      cat(cfa_model_simple, "\n")
+      
+      # Fit simple structure model
+      fit_cfa_simple <- tryCatch({
+        lavaan::cfa(
+          cfa_model_simple,
+          data = cfa_df,
+          std.lv = TRUE,
+          estimator = "WLSMV",
+          ordered = ordered_items
+        )
+      }, error = function(e) {
+        cat("[ERROR] Simple structure model failed to converge:\n")
+        print(e)
+        return(NULL)
+      })
+      
+      if (!is.null(fit_cfa_simple)) {
+        cat("\nSimple structure model fit indices:\n")
+        fit_simple_indices <- lavaan::fitMeasures(fit_cfa_simple, c("chisq", "df", "cfi", "rmsea", "srmr"))
+        print(fit_simple_indices)
+        
+        # Compare with original final model
+        cat("\nModel comparison (Original Final vs Simple Structure):\n")
+        fit_orig_indices <- lavaan::fitMeasures(fit_cfa_final, c("chisq", "df", "cfi", "rmsea", "srmr"))
+        comparison_df <- data.frame(
+          Model = c("Original_Final", "Simple_Structure"),
+          ChiSq = c(fit_orig_indices["chisq"], fit_simple_indices["chisq"]),
+          DF = c(fit_orig_indices["df"], fit_simple_indices["df"]),
+          CFI = c(fit_orig_indices["cfi"], fit_simple_indices["cfi"]),
+          RMSEA = c(fit_orig_indices["rmsea"], fit_simple_indices["rmsea"]),
+          SRMR = c(fit_orig_indices["srmr"], fit_simple_indices["srmr"])
+        )
+        print(comparison_df)
+        
+        # Check Q70 loadings in simple structure model
+        simple_loadings <- lavaan::inspect(fit_cfa_simple, "std")$lambda
+        cat("\nQ70 loadings in simple structure model:\n")
+        print(round(simple_loadings[q70_var, ], 3))
+        
+        # Bootstrap the simple structure model to check Q70 loading stability
+        cat("\nBootstrapping simple structure model to check Q70 loading stability...\n")
+        
+        B_boot_simple <- 100
+        n_cores <- max(1, parallel::detectCores() - 1)
+        cl <- makeCluster(n_cores)
+        registerDoSNOW(cl)
+        
+        pb <- txtProgressBar(max = B_boot_simple, style = 3)
+        opts <- list(progress = function(n) setTxtProgressBar(pb, n))
+        
+        boot_q70_loadings <- foreach(b = 1:B_boot_simple, .combine = c,
+                                    .packages = c("lavaan"),
+                                    .options.snow = opts) %dopar% {
+          # Bootstrap sample
+          boot_idx <- sample(nrow(cfa_df), replace = TRUE)
+          boot_data <- cfa_df[boot_idx, ]
+          
+          # Fit simple structure model
+          fit_boot <- tryCatch({
+            lavaan::cfa(
+              cfa_model_simple,
+              data = boot_data,
+              std.lv = TRUE,
+              estimator = "WLSMV",
+              ordered = ordered_items
+            )
+          }, error = function(e) NULL)
+          
+          if (is.null(fit_boot)) {
+            return(NA)
+          }
+          
+          # Extract Q70 loading on F1
+          loadings_boot <- lavaan::inspect(fit_boot, "std")$lambda
+          if (q70_var %in% rownames(loadings_boot)) {
+            return(loadings_boot[q70_var, "F1"])
+          } else {
+            return(NA)
+          }
+        }
+        
+        close(pb)
+        stopCluster(cl)
+        
+        # Analyze Q70 loading stability
+        q70_bootstrap_stats <- summary(boot_q70_loadings)
+        q70_bootstrap_sd <- sd(boot_q70_loadings, na.rm = TRUE)
+        
+        cat("\nQ70 → F1 loading bootstrap results (simple structure):\n")
+        cat("Mean:", round(mean(boot_q70_loadings, na.rm = TRUE), 3), "\n")
+        cat("SD:", round(q70_bootstrap_sd, 3), "\n")
+        cat("95% CI:", round(quantile(boot_q70_loadings, c(0.025, 0.975), na.rm = TRUE), 3), "\n")
+        cat("Convergence rate:", round(sum(!is.na(boot_q70_loadings)) / B_boot_simple * 100, 1), "%\n")
+        
+        # Compare with original Q70 loading SD if available
+        if (exists("boot_loadings_final") && ncol(boot_loadings_final) > 0) {
+          # Try to find Q70 F1 loading in original bootstrap
+          q70_f1_cols <- grep("Q70.*F1|loading.*Q70", colnames(boot_loadings_final), value = TRUE)
+          if (length(q70_f1_cols) > 0) {
+            orig_q70_sd <- sd(boot_loadings_final[, q70_f1_cols[1]], na.rm = TRUE)
+            cat("\nComparison of Q70 → F1 loading SD:\n")
+            cat("Original model SD:", round(orig_q70_sd, 3), "\n")
+            cat("Simple structure SD:", round(q70_bootstrap_sd, 3), "\n")
+            cat("Improvement:", round(orig_q70_sd - q70_bootstrap_sd, 3), "\n")
+          }
+        }
+        
+      }
+    } else {
+      cat("Q70 does not have substantial cross-loading on F2 (", round(q70_f2_loading, 3), ")\n")
+      cat("Simple structure is already achieved.\n")
+    }
+  }
+}
+
+# --- Issue 2: Check Correlated Residual Between Q112 and Q70 ---
+cat("\n[ISSUE 2] Checking Correlated Residual Between Q112 and Q70\n")
+cat(strrep("-", 60), "\n")
+
+if (exists("fit_cfa_final") && !is.null(fit_cfa_final)) {
+  # Get parameter table to check for correlated residuals
+  par_table_check <- lavaan::parTable(fit_cfa_final)
+  
+  # Look for correlated residual between Q112 and Q70
+  q112_var <- "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal"
+  q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+  
+  q112_q70_corr <- subset(par_table_check, 
+                         op == "~~" & 
+                         ((lhs == q112_var & rhs == q70_var) | 
+                          (lhs == q70_var & rhs == q112_var)))
+  
+  if (nrow(q112_q70_corr) > 0) {
+    cat("Correlated residual between Q112 and Q70 found:\n")
+    
+    # Check which columns are available and select only existing ones
+    available_cols <- names(q112_q70_corr)
+    desired_cols <- c("lhs", "op", "rhs", "est", "se", "pvalue")
+    cols_to_print <- intersect(desired_cols, available_cols)
+    
+    if (length(cols_to_print) > 0) {
+      print(q112_q70_corr[, cols_to_print, drop = FALSE])
+    } else {
+      print(q112_q70_corr)
+    }
+    
+    # Safely extract correlation value
+    if ("est" %in% available_cols) {
+      corr_value <- q112_q70_corr$est[1]
+    } else {
+      # Try alternative column names that might contain the estimate
+      est_cols <- grep("est|coef|value", available_cols, ignore.case = TRUE, value = TRUE)
+      if (length(est_cols) > 0) {
+        corr_value <- q112_q70_corr[[est_cols[1]]][1]
+      } else {
+        cat("Warning: Could not find estimate column in parameter table\n")
+        corr_value <- NA
+      }
+    }
+    if (!is.na(corr_value)) {
+      cat("\nCorrelated residual value:", round(corr_value, 3), "\n")
+    } else {
+      cat("\nCorrelated residual value: Could not extract estimate\n")
+    }
+    
+    if (!is.na(corr_value) && abs(corr_value) > 0.8) {
+      cat("WARNING: Very high correlated residual (|r| > 0.8) suggests substantial unexplained shared variance\n")
+      cat("This may indicate:\n")
+      cat("1. Missing common cause variable\n")
+      cat("2. Need for a separate factor for these items\n")
+      cat("3. Measurement overlap between items\n")
+      
+      # Test model without the correlated residual
+      cat("\nTesting model without Q112-Q70 correlated residual...\n")
+      
+      # Remove the correlated residual from model syntax
+      model_lines <- strsplit(cfa_model_final, "\n")[[1]]
+      model_lines_filtered <- model_lines[!grepl("Q112.*Q70|Q70.*Q112", model_lines)]
+      cfa_model_no_corr <- paste(model_lines_filtered, collapse = "\n")
+      
+      fit_cfa_no_corr <- tryCatch({
+        lavaan::cfa(
+          cfa_model_no_corr,
+          data = cfa_df,
+          std.lv = TRUE,
+          estimator = "WLSMV",
+          ordered = ordered_items
+        )
+      }, error = function(e) {
+        cat("[ERROR] Model without correlated residual failed:\n")
+        print(e)
+        return(NULL)
+      })
+      
+      if (!is.null(fit_cfa_no_corr)) {
+        cat("\nFit comparison (with vs without Q112-Q70 correlated residual):\n")
+        fit_with_corr <- lavaan::fitMeasures(fit_cfa_final, c("chisq", "df", "cfi", "rmsea", "srmr"))
+        fit_no_corr <- lavaan::fitMeasures(fit_cfa_no_corr, c("chisq", "df", "cfi", "rmsea", "srmr"))
+        
+        comparison_corr_df <- data.frame(
+          Model = c("With_Corr_Residual", "Without_Corr_Residual"),
+          ChiSq = c(fit_with_corr["chisq"], fit_no_corr["chisq"]),
+          DF = c(fit_with_corr["df"], fit_no_corr["df"]),
+          CFI = c(fit_with_corr["cfi"], fit_no_corr["cfi"]),
+          RMSEA = c(fit_with_corr["rmsea"], fit_no_corr["rmsea"]),
+          SRMR = c(fit_with_corr["srmr"], fit_no_corr["srmr"])
+        )
+        print(comparison_corr_df)
+        
+        # Chi-square difference test
+        chi_diff <- fit_no_corr["chisq"] - fit_with_corr["chisq"]
+        df_diff <- fit_no_corr["df"] - fit_with_corr["df"]
+        p_diff <- 1 - pchisq(chi_diff, df_diff)
+        
+        cat("\nChi-square difference test:\n")
+        cat("Δχ² =", round(chi_diff, 3), ", Δdf =", df_diff, ", p =", round(p_diff, 3), "\n")
+        if (p_diff < 0.001) {
+          cat("The correlated residual significantly improves model fit (p < 0.001)\n")
+        } else {
+          cat("The correlated residual may not be necessary (p ≥ 0.001)\n")
+        }
+      }
+    } else {
+      cat("Correlated residual is within acceptable range (|r| ≤ 0.8)\n")
+    }
+  } else {
+    cat("No correlated residual between Q112 and Q70 found in current model\n")
+  }
+}
+
+# --- Issue 3: Check Collinearity Between Q70 and Q108 ---
+cat("\n[ISSUE 3] Checking Collinearity Between Q70 and Q108\n")
+cat(strrep("-", 60), "\n")
+
+q70_var <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
+q108_var <- "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous"
+
+if (q70_var %in% names(cfa_df) && q108_var %in% names(cfa_df)) {
+  # Calculate correlation between Q70 and Q108
+  q70_q108_corr <- cor(as.numeric(cfa_df[[q70_var]]), cfa_df[[q108_var]], use = "complete.obs")
+  
+  cat("Correlation between Q70 (binary) and Q108 (continuous):", round(q70_q108_corr, 3), "\n")
+  
+  # Check the distributions
+  cat("\nQ70 (binary) distribution:\n")
+  q70_table <- table(cfa_df[[q70_var]], useNA = "ifany")
+  print(q70_table)
+  print(round(prop.table(q70_table), 3))
+  
+  cat("\nQ108 (continuous) summary:\n")
+  print(summary(cfa_df[[q108_var]]))
+  
+  # Examine the relationship more closely
+  cat("\nQ108 values by Q70 categories:\n")
+  q108_by_q70 <- aggregate(cfa_df[[q108_var]], 
+                          by = list(Q70 = cfa_df[[q70_var]]), 
+                          FUN = function(x) c(mean = mean(x, na.rm = TRUE), 
+                                             sd = sd(x, na.rm = TRUE),
+                                             n = sum(!is.na(x))))
+  print(q108_by_q70)
+  
+  # Point-biserial correlation (appropriate for binary-continuous correlation)
+  if (requireNamespace("ltm", quietly = TRUE)) {
+    pb_corr <- ltm::biserial.cor(cfa_df[[q108_var]], cfa_df[[q70_var]], use = "complete.obs")
+    cat("\nPoint-biserial correlation:", round(pb_corr, 3), "\n")
+  } else {
+    cat("\nNote: Install 'ltm' package for point-biserial correlation calculation\n")
+  }
+  
+  # Check if collinearity is problematic
+  if (abs(q70_q108_corr) > 0.9) {
+    cat("\nWARNING: Very high correlation (|r| > 0.9) indicates near-perfect collinearity\n")
+    cat("This can cause:\n")
+    cat("1. Numerical instability in parameter estimation\n")
+    cat("2. Inflated standard errors\n")
+    cat("3. Unreliable factor loadings\n")
+    
+    cat("\nRecommended solutions:\n")
+    cat("1. Use the Q70+Q108 composite variable (already implemented)\n")
+    cat("2. Drop one of the variables\n")
+    cat("3. Use regularization techniques\n")
+    
+    # Test the composite approach if it exists
+    if ("Q70_Q108_composite" %in% names(cfa_df) && exists("fit_cfa_composite") && !is.null(fit_cfa_composite)) {
+      cat("\nComposite approach results:\n")
+      composite_fit <- lavaan::fitMeasures(fit_cfa_composite, c("chisq", "df", "cfi", "rmsea", "srmr"))
+      print(composite_fit)
+      
+      # Check if composite loading is more stable
+      composite_loadings <- lavaan::inspect(fit_cfa_composite, "std")$lambda
+      if ("Q70_Q108_composite" %in% rownames(composite_loadings)) {
+        cat("\nQ70+Q108 composite loading:\n")
+        print(round(composite_loadings["Q70_Q108_composite", ], 3))
+      }
+    }
+    
+  } else if (abs(q70_q108_corr) > 0.7) {
+    cat("\nModerate to high correlation (|r| > 0.7) - monitor for estimation issues\n")
+  } else {
+    cat("\nCorrelation is within acceptable range (|r| ≤ 0.7)\n")
+  }
+  
+  # Additional check: Variance Inflation Factor (VIF) if possible
+  cat("\nChecking for multicollinearity using variance inflation...\n")
+  
+  # Create a simple regression to estimate VIF-like measure
+  q70_numeric <- as.numeric(cfa_df[[q70_var]])
+  q108_standardized <- scale(cfa_df[[q108_var]])[, 1]
+  
+  # Regress Q70 on Q108
+  vif_model <- lm(q70_numeric ~ q108_standardized)
+  r_squared <- summary(vif_model)$r.squared
+  vif_estimate <- 1 / (1 - r_squared)
+  
+  cat("Pseudo-VIF (Q70 explained by Q108):", round(vif_estimate, 3), "\n")
+  if (vif_estimate > 10) {
+    cat("WARNING: High VIF (> 10) indicates serious multicollinearity\n")
+  } else if (vif_estimate > 5) {
+    cat("CAUTION: Moderate VIF (> 5) suggests potential multicollinearity\n")
+  } else {
+    cat("VIF is acceptable (< 5)\n")
+  }
+  
+} else {
+  cat("Q70 or Q108 variables not found in dataset\n")
+}
+
+# --- Summary of Diagnostic Results ---
+cat("\n[SUMMARY] Diagnostic Results Summary\n")
+cat(strrep("-", 60), "\n")
+
+cat("\n1. Simple Structure (Q70 cross-loading):\n")
+if (exists("fit_cfa_simple") && !is.null(fit_cfa_simple)) {
+  cat("   ✓ Simple structure model fitted successfully\n")
+  if (exists("q70_bootstrap_sd")) {
+    cat("   ✓ Q70 loading bootstrap SD:", round(q70_bootstrap_sd, 3), "\n")
+  }
+} else {
+  cat("   - Simple structure not needed or failed to fit\n")
+}
+
+cat("\n2. Q112-Q70 Correlated Residual:\n")
+if (exists("q112_q70_corr") && nrow(q112_q70_corr) > 0) {
+  cat("   ⚠ Correlated residual present:", round(q112_q70_corr$est[1], 3), "\n")
+  if (abs(q112_q70_corr$est[1]) > 0.8) {
+    cat("   ⚠ Very high correlation - consider theoretical explanation\n")
+  }
+} else {
+  cat("   ✓ No problematic correlated residual found\n")
+}
+
+cat("\n3. Q70-Q108 Collinearity:\n")
+if (exists("q70_q108_corr")) {
+  cat("   ⚠ Correlation:", round(q70_q108_corr, 3), "\n")
+  if (exists("vif_estimate")) {
+    cat("   ⚠ Pseudo-VIF:", round(vif_estimate, 3), "\n")
+  }
+  if (abs(q70_q108_corr) > 0.9) {
+    cat("   ⚠ High collinearity - composite approach recommended\n")
+  }
+} else {
+  cat("   - Could not assess collinearity\n")
+}
+
+cat("\nFinal Recommendations:\n")
+if (exists("fit_cfa_simple") && !is.null(fit_cfa_simple) && exists("q70_bootstrap_sd") && q70_bootstrap_sd < 0.1) {
+  cat("- ✓ Use simple structure model (improved Q70 loading stability)\n")
+}
+if (exists("q112_q70_corr") && nrow(q112_q70_corr) > 0 && abs(q112_q70_corr$est[1]) > 0.8) {
+  cat("- Consider theoretical explanation for Q112-Q70 relationship\n")
+}
+if (exists("q70_q108_corr") && abs(q70_q108_corr) > 0.9) {
+  cat("- ✓ Use Q70+Q108 composite to address collinearity\n")
+}
+
+cat("\n", strrep("=", 80), "\n")
+cat("ADDITIONAL DIAGNOSTICS COMPLETE\n")
+cat(strrep("=", 80), "\n")
+
+
