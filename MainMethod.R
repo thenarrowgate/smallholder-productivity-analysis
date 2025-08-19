@@ -1,14 +1,8 @@
+
 # ---------------------------------------------------------------------------
-# MainMethod.R
-# ---------------------------------------------------------------------------
-# This script performs the factor analytic pipeline described in the
-# repository README.  After loading the cleaned Nepal or Senegal dataset it
-# builds an appropriate correlation matrix, runs a large bootstrap EFA to
-# obtain stable loadings, prunes unstable items and finally assesses the
-# solution's robustness via Tucker's phi and Hancock's H.
+# Step 1. Load required packages
 # ---------------------------------------------------------------------------
 
-# Step 1 ─ Load required packages
 # Before attaching libraries, check that all dependencies are installed. This
 # produces a clear diagnostic list instead of failing on the first missing
 # package so that environments lacking R packages can be configured easily.
@@ -34,6 +28,7 @@ required_packages <- c(
   "mediation"   # causal mediation analysis
 )
 
+# Mainly added for agent models trying to run the script during development
 missing_pkgs <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
 if (length(missing_pkgs) > 0) {
   cat(">>> ERROR: missing required packages:\n")
@@ -43,11 +38,19 @@ if (length(missing_pkgs) > 0) {
 
 invisible(lapply(required_packages, library, character.only = TRUE))
 
-# Step 2 ─ Set seed and working directory
-# Resolve where the script is running from so relative paths work both when
-# executed interactively and via Rscript.  A seed is set for reproducible
-# bootstrap samples.
+# ---------------------------------------------------------------------------
+# Step 2. Set seed and working directory
+# ---------------------------------------------------------------------------
+
+# Set a fixed seed to ensure reproducible bootstrap samples 
 set.seed(2025)
+
+# Figure out the directory from which being ran. A direct path
+# provided via the command line can be accepted; if none provided
+# tries to infer the script from command line argument files,
+# and if none given falls back to the current directory.
+# Then, it switches the working directory to this path that
+# it resolved.
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) > 0) {
   LOCAL_DIR <- args[1]
@@ -65,19 +68,26 @@ if (length(args) > 0) {
 }
 setwd(LOCAL_DIR)
 
-# Step 3 ─ Load the prepared dataset
-# The Python preprocessing notebook saves a clean Excel file. The outcome
-# columns used later in SEM are removed here so that EFA only sees the
+# ---------------------------------------------------------------------------
+# Step 3. Load the prepared dataset
+# ---------------------------------------------------------------------------
+
+# Loads the provided path to the preprocessed data in an excel file.
+# Removed the agricultural productivity and sustainability score
+# explained variables via their standardized names, keeping only
 # predictor variables.
 df <- read_excel("nepal_dataframe_FA.xlsx")
 y_prod <- df$Q0__AGR_PROD__continuous
 df     <- df %>% dplyr::select(-Q0__AGR_PROD__continuous,
 -Q0__sustainable_livelihood_score__continuous)
 
-# Step 4 ─ Split variables by declared type
-# Variable names encode their measurement level after the final "__".
+# ---------------------------------------------------------------------------
+# Step 4. Split variables by declared type
+# ---------------------------------------------------------------------------
+
+# In the given standardized variable names  that Variable names encode their measurement level after the final "__".
 # This split lets us treat each class appropriately when forming the
-# correlation matrix.
+# correlation matrix, allows us to seperate nominals from the numeric columns
 types <- str_split(names(df), "__", simplify = TRUE)[,3]
 types[types == "binary_nominal"] <- "nominal"
 df_cont <- df[, types == "continuous", drop = FALSE]
@@ -85,27 +95,23 @@ df_ord  <- df[, types == "ordinal",    drop = FALSE]
 df_bin  <- df[, types == "binary",     drop = FALSE]
 df_nom  <- df[, types == "nominal",    drop = FALSE]
 
-# Step 5 ─ Convert ordinal/binary variables to ordered factors
-# Treating these as ordered ensures that polychoric/polyserial correlations
-# are used later when ``COR_METHOD == "mixed"``.
-df_ord_factored <- df_ord %>% mutate(across(everything(), ordered))
-df_bin_factored <- df_bin %>% mutate(across(everything(), ordered))
+df_num <- bind_cols(df_cont, df_ord, df_bin)
+df_num <- df_num %>% mutate(across(everything(), as.numeric))
 
-# Step 6 ─ Reassemble a single data frame and remove incomplete cases
-# Only columns with no missing values are kept for EFA.
-df_mix2       <- bind_cols(df_cont, df_ord_factored, df_bin_factored)
-df_mix2_clean <- df_mix2[, colSums(is.na(df_mix2)) == 0]
 
-# Step 7 ─ Sanity check the columns
+# ---------------------------------------------------------------------------
+# Step 7. Sanity check the columns
+# ---------------------------------------------------------------------------
+
 # Print each column's class and drop anything unexpected.  In practice all
 # variables should be numeric, integer, factor or ordered.  This guard helps
 # catch stray list-columns from earlier processing.
 cat(">>> DEBUG: column classes:\n")
-print(sapply(df_mix2_clean, class))
+print(sapply(df_num, class))
 allowed <- function(x) {
   inherits(x, c("numeric","integer","factor","ordered","logical","character"))
 }
-good_cols <- vapply(df_mix2_clean, allowed, logical(1))
+good_cols <- vapply(df_num, allowed, logical(1))
 bad_cols  <- names(good_cols)[!good_cols]
 if (length(bad_cols) > 0) {
   cat(">>> WARNING: dropping unsupported columns:\n")
@@ -113,31 +119,23 @@ if (length(bad_cols) > 0) {
   df_mix2_clean <- df_mix2_clean[, good_cols]
 }
 cat(">>> POST‐CLEAN: column classes:\n")
-print(sapply(df_mix2_clean, class))
-(df_mix2_clean <- as.data.frame(df_mix2_clean))
-cat("Post‐conversion class: ", class(df_mix2_clean), "\n")
+print(sapply(df_num, class))
+(df_num <- as.data.frame(df_num))
+cat("Post‐conversion class: ", class(df_num), "\n")
 
-
-# ── Step 8 ─ Compute correlation matrix ---------------------------------------
+# ---------------------------------------------------------------------------
+# Step 8. Compute spearman correlation matrix
+# ---------------------------------------------------------------------------
 # ``COR_METHOD`` toggles between a heterogeneous polychoric/polyserial
 # correlation matrix ("mixed") and a simpler Spearman matrix treating all
 # variables as numeric ranks.  The mixed option is slower but more faithful
 # to the measurement levels.
-COR_METHOD <- "spearman"
 
-if (COR_METHOD == "mixed") {
-  het_out <- hetcor(df_mix2_clean, use = "pairwise.complete.obs")
-  R_mixed <- het_out$correlations   # base: polyserial/polychoric + Pearson from hetcor
-} else if (COR_METHOD == "spearman") {
-  df_numeric <- df_mix2_clean %>% mutate(across(everything(), as.numeric))
-  R_mixed <- cor(df_numeric, method = "spearman", use = "pairwise.complete.obs")
-} else {
-  stop("Unknown COR_METHOD")
-}
+R <- cor(df_num, method = "spearman", use = "pairwise.complete.obs")
 
 # --- REBUILD type vector to align with df_mix2_clean ---------------------------
 # (We can't reuse `types` from Step 4 because columns were dropped.)
-types_clean <- str_split(names(df_mix2_clean), "__", simplify = TRUE)[, 3]
+types_clean <- str_split(names(df_num), "__", simplify = TRUE)[, 3]
 types_clean[types_clean == "binary_nominal"] <- "nominal"  # just in case
 
 # --- Identify continuous cols in the CLEANED data ------------------------------
@@ -146,95 +144,64 @@ cont_idx <- which(types_clean == "continuous")
 # (Optional) quick report
 cat("Continuous vars in cleaned data:", length(cont_idx), "\n")
 
-# --- Robust bicor for continuous block ----------------------------------------
-if (COR_METHOD == "mixed" && length(cont_idx) > 1) {
-  
-  # Extract continuous subset from the *cleaned* data
-  df_cont_clean <- df_mix2_clean[, cont_idx, drop = FALSE]
-  
-  # Optional: flag zero-MAD columns (can distort bicor)
-  mad_vals <- apply(df_cont_clean, 2, mad, na.rm = TRUE)
-  if (any(mad_vals == 0)) {
-    cat("WARNING: zero MAD in continuous vars:\n")
-    print(names(mad_vals)[mad_vals == 0])
-    # bicor() will fallback to Pearson for these vars; acceptable unless many.
-  }
-  
-  # Compute robust correlation
-  R_cont <- WGCNA::bicor(
-    as.matrix(df_cont_clean),
-    use = "pairwise.complete.obs"
-  )
-  
-  # Overwrite the continuous-continuous block in the mixed matrix
-  R_mixed[cont_idx, cont_idx] <- R_cont
-  
-  # Enforce symmetry numerically (defensive; should already be symmetric)
-  R_mixed[cont_idx, cont_idx] <-
-    (R_mixed[cont_idx, cont_idx] + t(R_mixed[cont_idx, cont_idx])) / 2
-  
-  # Force exact 1s on the diagonal (good hygiene before EFA)
-  diag(R_mixed) <- 1
-}
-
 # Regardless of method we ensure the matrix is positive definite before
 # KMO/Bartlett tests or factor extraction. nearPD performs a minimal
 # adjustment when needed.
-R_mixed <- as.matrix(nearPD(R_mixed, corr = TRUE)$mat)
+#R_mixed <- as.matrix(nearPD(R_mixed, corr = TRUE)$mat)
 
-stopifnot(!any(is.na(R_mixed)))
-# Step 8b - Suitability checks: KMO and Bartlett tests
+stopifnot(!any(is.na(R)))
+
+# ---------------------------------------------------------------------------
+# Step 8. Suitability checks and pruning
+# ---------------------------------------------------------------------------
+# KMO and Bartlett tests
 # These diagnostics help verify whether factor analysis is appropriate for
 # the correlation matrix.
-kmo_res <- psych::KMO(R_mixed)
-bart_res <- psych::cortest.bartlett(R_mixed, n = nrow(df_mix2_clean))
+kmo_res <- psych::KMO(R)
+bart_res <- psych::cortest.bartlett(R, n = nrow(df_num))
 cat("KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
 cat("Bartlett's test p-value:", signif(bart_res$p.value, 3), "\n")
 
 # -- Per-variable MSA assessment ----------------------------------------------
 # Drop variables that fall below the commonly-used MSA threshold of 0.5.
 msa_vec <- kmo_res$MSAi
-names(msa_vec) <- colnames(R_mixed)
+names(msa_vec) <- colnames(R)
 low_msa <- msa_vec[msa_vec < 0.5]
 if (length(low_msa) > 0) {
   cat("Variables dropped for low MSA (<0.5):\n")
   print(round(low_msa, 3))
-  keep_vars <- setdiff(colnames(R_mixed), names(low_msa))
-  R_mixed <- R_mixed[keep_vars, keep_vars]
-  df_mix2_clean <- df_mix2_clean[, keep_vars, drop = FALSE]
+  keep_vars <- setdiff(colnames(R), names(low_msa))
+  R <- R[keep_vars, keep_vars]
+  df_num <- df_num[, keep_vars, drop = FALSE]
 } else {
   cat("No variables dropped for low MSA\n")
 }
 
+# Check KMO of pruned correlation matrix
+kmo_res <- psych::KMO(R)
+cat("updated KMO overall MSA:", round(kmo_res$MSA, 3), "\n")
 
-if (COR_METHOD == "mixed") {
-  ev_raw <- eigen(hetcor(df_mix2_clean, use = "pairwise.complete.obs")$correlations)$values
-} else {
-  df_num_ev <- as.data.frame(lapply(df_mix2_clean, as.numeric))
-  ev_raw <- eigen(cor(df_num_ev, method = "spearman", use = "pairwise.complete.obs"))$values
-}
-ev_adj <- eigen(R_mixed)$values
-# Quick diagnostic plot to ensure the adjusted correlation matrix retains a
-# similar eigen spectrum to the raw correlations.
-plot(ev_raw, ev_adj, main="Eigenvalue comparison")
+# ---------------------------------------------------------------------------
+# Step 9. Determine number of factors (parallel analysis & MAP)
+# ---------------------------------------------------------------------------
 
-
-
-# Step 9 ─ Determine number of factors (parallel analysis & MAP)
 # Two common heuristics are used: Horn's parallel analysis (upper bound)
 # and Velicer's MAP (lower bound).  ``k`` can be set manually or using one
 # of these estimates.
-pa_out <- fa.parallel(R_mixed, n.obs = nrow(df_mix2_clean),
+pa_out <- fa.parallel(R, n.obs = nrow(df_num),
                       fm = "minres", fa = "fa",
                       n.iter = 500, quant = .95,
                       cor = "cor", use = "pairwise", plot = FALSE)
 k_PA  <- pa_out$nfact
-vss_out <- VSS(R_mixed, n = ncol(R_mixed),
-               fm = "minres", n.obs = nrow(df_mix2_clean), plot = FALSE)
+vss_out <- VSS(R, n = ncol(R),
+               fm = "minres", n.obs = nrow(df_num), plot = FALSE)
 k_MAP <- which.min(vss_out$map)
-k     <- 2 # manual override; could also use k_MAP or k_PA
+k     <- k_MAP
 
-# Step 10 ─ Bootstrap robust MINRES+geomin to get loadings & uniquenesses
+# ---------------------------------------------------------------------------
+# Step 10. Bootstrap robust MINRES+geomin to get loadings & uniquenesses
+# ---------------------------------------------------------------------------
+
 # Each iteration draws a bootstrap sample, computes a correlation matrix and
 # extracts a factor solution.  The median across iterations serves as a robust
 # estimate of the loadings.
@@ -265,6 +232,7 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                          fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
                                           error=function(e) NULL)
                          if(is.null(fa_b)) next
+                         
                          return(c(as.vector(fa_b$loadings[]), fa_b$uniquenesses))
                        }
                      }
