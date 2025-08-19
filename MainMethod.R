@@ -25,7 +25,8 @@ required_packages <- c(
   "tidyr",      # pivot_longer()
   "WGCNA",      # provides bicor()
   "Matrix",     # nearPD for KMO/Bartlett
-  "mediation"   # causal mediation analysis
+  "mediation",  # causal mediation analysis
+  "clue"        # for solve LSAP
 )
 
 # Mainly added for agent models trying to run the script during development
@@ -202,10 +203,30 @@ k     <- k_MAP
 # Step 10. Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 # ---------------------------------------------------------------------------
 
+# align sign and column permutation to reference loading so bootstrap summaries
+# aren't blurred
+align_to_ref <- function(L, L_ref, Phi = NULL) {
+  L     <- as.matrix(L); L_ref <- as.matrix(L_ref)
+  C     <- factor.congruence(L_ref, L)                   # k x k
+  perm  <- clue::solve_LSAP(abs(C), maximum = TRUE)            # best column matching
+  Lp    <- L[, perm, drop = FALSE]
+  sgn   <- sign(diag(t(L_ref) %*% Lp)); sgn[sgn == 0] <- 1
+  Lp    <- sweep(Lp, 2, sgn, `*`)
+  if (is.null(Phi)) return(list(L = Lp, perm = perm, sgn = sgn))
+  Phip  <- Phi[perm, perm, drop = FALSE]
+  S     <- diag(sgn)
+  Phip  <- S %*% Phip %*% S
+  list(L = Lp, Phi = Phip, perm = perm, sgn = sgn)
+}
+
+# Reference from full data (use your chosen k, fm, rotation)
+fa_ref <- fa(R, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(df))
+L_ref  <- as.matrix(fa_ref$loadings)   # p x k pattern matrix
+
 # Each iteration draws a bootstrap sample, computes a correlation matrix and
 # extracts a factor solution.  The median across iterations serves as a robust
 # estimate of the loadings.
-p <- ncol(df_mix2_clean)
+p <- ncol(df_num)
 B <- 1000
 n_cores <- max(1, parallel::detectCores() - 1)
 cl <- makeCluster(n_cores); registerDoSNOW(cl)
@@ -214,9 +235,10 @@ opts <- list(progress = function(n) setTxtProgressBar(pb, n))
 
 boot_load <- foreach(b=1:B, .combine=rbind,
                      .packages=c("psych","polycor","Matrix"),
+                     .export   = c("align_to_ref","L_ref","k","COR_METHOD"),
                      .options.snow=opts) %dopar% {
                        repeat {
-                         samp <- df_mix2_clean[sample(nrow(df_mix2_clean), replace=TRUE), ]
+                         samp <- df_num[sample(nrow(df_num), replace=TRUE), ]
                          Rb   <- tryCatch({
                            if (COR_METHOD == "mixed") {
                              hetcor(samp, use = "pairwise.complete.obs")$correlations
@@ -229,11 +251,14 @@ boot_load <- foreach(b=1:B, .combine=rbind,
                          # Stabilise the correlation matrix for "fa" in case
                          # bootstrapping produced a non positive-definite Rb
                          Rb   <- as.matrix(nearPD(Rb, corr = TRUE)$mat)
-                         fa_b <- tryCatch(fa(Rb, nfactors=k, fm="minres", rotate="geominQ", n.obs=nrow(samp)),
-                                          error=function(e) NULL)
+                         fa_b <- tryCatch(fa(Rb, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(samp)),
+                                          error = function(e) NULL)
                          if(is.null(fa_b)) next
                          
-                         return(c(as.vector(fa_b$loadings[]), fa_b$uniquenesses))
+                         al   <- align_to_ref(fa_b$loadings, L_ref)
+                         L_al <- al$L
+                         
+                         return(c(as.vector(L_al), fa_b$uniquenesses))
                        }
                      }
 close(pb); stopCluster(cl)
