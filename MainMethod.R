@@ -9,25 +9,39 @@
 # ---------------------------------------------------------------------------
 
 # Step 1 ─ Load required packages
-library(dplyr)       # data wrangling
-library(EFAtools)    # VSS(), tenBerge scores
-library(boot)        # bootstrap()
-library(Gifi)        # princals()
-library(lavaan)      # sem()
-library(mgcv)        # gam()
-library(mgcViz)      # diagnostic tools for mgcv::gam
-library(polycor)     # hetcor()
-library(psych)       # mixedCor(), fa.*, factor.congruence(), factor.scores
-library(readxl)      # read_excel()
-library(stringr)     # str_split()
-library(doSNOW)      # parallel backend
-library(foreach)     # foreach looping
-library(ggplot2)     # plotting
-library(reshape2)    # melt()
-library(tidyr)       # pivot_longer()
-library(WGCNA)   # provides bicor()
-library(Matrix)   # nearPD for KMO/Bartlett
-library(mediation)   # causal mediation analysis
+# Before attaching libraries, check that all dependencies are installed. This
+# produces a clear diagnostic list instead of failing on the first missing
+# package so that environments lacking R packages can be configured easily.
+required_packages <- c(
+  "dplyr",      # data wrangling
+  "EFAtools",   # VSS(), tenBerge scores
+  "boot",       # bootstrap()
+  "Gifi",       # princals()
+  "lavaan",     # sem()
+  "mgcv",       # gam()
+  "mgcViz",     # diagnostic tools for mgcv::gam
+  "polycor",    # hetcor()
+  "psych",      # mixedCor(), fa.*, factor.congruence(), factor.scores
+  "readxl",     # read_excel()
+  "stringr",    # str_split()
+  "doSNOW",     # parallel backend
+  "foreach",    # foreach looping
+  "ggplot2",    # plotting
+  "reshape2",   # melt()
+  "tidyr",      # pivot_longer()
+  "WGCNA",      # provides bicor()
+  "Matrix",     # nearPD for KMO/Bartlett
+  "mediation"   # causal mediation analysis
+)
+
+missing_pkgs <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
+if (length(missing_pkgs) > 0) {
+  cat(">>> ERROR: missing required packages:\n")
+  print(missing_pkgs)
+  stop("Install the above packages and rerun MainMethod.R")
+}
+
+invisible(lapply(required_packages, library, character.only = TRUE))
 
 # Step 2 ─ Set seed and working directory
 # Resolve where the script is running from so relative paths work both when
@@ -2839,16 +2853,23 @@ if (!is.null(fit_core)) {
     unstd_cov <- q112_q70_resid$est[1]
     unstd_se <- q112_q70_resid$se[1]
     unstd_pvalue <- q112_q70_resid$pvalue[1]
-    
+
     cat("📊 Unstandardized Residual Covariance:\n")
     cat("   Estimate = ", round(unstd_cov, 3), "\n")
     cat("   SE = ", round(unstd_se, 3), "\n")
     cat("   z = ", round(unstd_cov / unstd_se, 2), "\n")
-    cat("   p = ", round(unstd_pvalue, 3), "\n")
-    
+    if (!is.null(unstd_pvalue) && is.numeric(unstd_pvalue) && !is.na(unstd_pvalue)) {
+      cat("   p = ", round(unstd_pvalue, 3), "\n")
+    } else {
+      cat("   p = NA\n")
+    }
+
     # Standardized correlation
-    residuals_std <- lavaan::residuals(fit_core, type = "standardized")
-    if ("cov" %in% names(residuals_std)) {
+    residuals_std <- tryCatch(
+      lavaan::residuals(fit_core, type = "standardized", se = FALSE),
+      error = function(e) NULL
+    )
+    if (!is.null(residuals_std) && "cov" %in% names(residuals_std)) {
       std_resid_matrix <- residuals_std$cov
       if (q112_var %in% rownames(std_resid_matrix) && q70_var %in% colnames(std_resid_matrix)) {
         std_resid_corr <- std_resid_matrix[q112_var, q70_var]
