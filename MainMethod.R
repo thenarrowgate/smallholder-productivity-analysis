@@ -2865,8 +2865,11 @@ if (!is.null(fit_core)) {
     }
 
     # Standardized correlation
-    residuals_std <- lavaan::residuals(fit_core, type = "standardized")
-    if ("cov" %in% names(residuals_std)) {
+    residuals_std <- tryCatch(
+      lavaan::residuals(fit_core, type = "standardized", se = FALSE),
+      error = function(e) NULL
+    )
+    if (!is.null(residuals_std) && "cov" %in% names(residuals_std)) {
       std_resid_matrix <- residuals_std$cov
       if (q112_var %in% rownames(std_resid_matrix) && q70_var %in% colnames(std_resid_matrix)) {
         std_resid_corr <- std_resid_matrix[q112_var, q70_var]
