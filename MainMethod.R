@@ -203,12 +203,11 @@ k     <- k_MAP
 # Step 10. Bootstrap robust MINRES+geomin to get loadings & uniquenesses
 # ---------------------------------------------------------------------------
 
-# align sign and column permutation to reference loading so bootstrap summaries
-# aren't blurred
+# Helper: align sign and factor order to a reference (uses clue::solve_LSAP)
 align_to_ref <- function(L, L_ref, Phi = NULL) {
   L     <- as.matrix(L); L_ref <- as.matrix(L_ref)
-  C     <- factor.congruence(L_ref, L)                   # k x k
-  perm  <- clue::solve_LSAP(abs(C), maximum = TRUE)            # best column matching
+  C     <- psych::factor.congruence(L_ref, L)     # k x k
+  perm  <- clue::solve_LSAP(abs(C), maximum = TRUE)
   Lp    <- L[, perm, drop = FALSE]
   sgn   <- sign(diag(t(L_ref) %*% Lp)); sgn[sgn == 0] <- 1
   Lp    <- sweep(Lp, 2, sgn, `*`)
@@ -219,380 +218,494 @@ align_to_ref <- function(L, L_ref, Phi = NULL) {
   list(L = Lp, Phi = Phip, perm = perm, sgn = sgn)
 }
 
-# Reference from full data (use your chosen k, fm, rotation)
-fa_ref <- fa(R, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(df))
-L_ref  <- as.matrix(fa_ref$loadings)   # p x k pattern matrix
+fa_ref <- psych::fa(R, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(df_num))
+L_ref  <- as.matrix(fa_ref$loadings)   # p x k
 
-# Each iteration draws a bootstrap sample, computes a correlation matrix and
-# extracts a factor solution.  The median across iterations serves as a robust
-# estimate of the loadings.
+# Bootstrap EFA (Spearman-only)
 p <- ncol(df_num)
 B <- 1000
+
 n_cores <- max(1, parallel::detectCores() - 1)
-cl <- makeCluster(n_cores); registerDoSNOW(cl)
-pb <- txtProgressBar(max=B, style=3)
+cl <- parallel::makeCluster(n_cores); doSNOW::registerDoSNOW(cl)
+pb <- txtProgressBar(max = B, style = 3)
 opts <- list(progress = function(n) setTxtProgressBar(pb, n))
 
-boot_load <- foreach(b=1:B, .combine=rbind,
-                     .packages=c("psych","polycor","Matrix"),
-                     .export   = c("align_to_ref","L_ref","k","COR_METHOD"),
-                     .options.snow=opts) %dopar% {
-                       repeat {
-                         samp <- df_num[sample(nrow(df_num), replace=TRUE), ]
-                         Rb   <- tryCatch({
-                           if (COR_METHOD == "mixed") {
-                             hetcor(samp, use = "pairwise.complete.obs")$correlations
-                           } else {
-                             samp_num <- as.data.frame(lapply(samp, as.numeric))
-                             cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
-                           }
-                         }, error=function(e) NULL)
-                         if(is.null(Rb) || any(is.na(Rb))) next
-                         # Stabilise the correlation matrix for "fa" in case
-                         # bootstrapping produced a non positive-definite Rb
-                         Rb   <- as.matrix(nearPD(Rb, corr = TRUE)$mat)
-                         fa_b <- tryCatch(fa(Rb, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(samp)),
-                                          error = function(e) NULL)
-                         if(is.null(fa_b)) next
-                         
-                         al   <- align_to_ref(fa_b$loadings, L_ref)
-                         L_al <- al$L
-                         
-                         return(c(as.vector(L_al), fa_b$uniquenesses))
-                       }
-                     }
-close(pb); stopCluster(cl)
+boot_load <- foreach::foreach(
+  b = 1:B, .combine = rbind,
+  .packages = c("psych","Matrix","clue"),               # polycor removed
+  .export   = c("align_to_ref","L_ref","k")
+  , .options.snow = opts
+) %dopar% {
+  repeat {
+    # a) bootstrap sample (size n with replacement)
+    samp <- df_num[sample(nrow(df_num), replace = TRUE), , drop = FALSE]
+    
+    # b) Spearman correlation
+    samp_num <- as.data.frame(lapply(samp, as.numeric))
+    Rb <- tryCatch(
+      cor(samp_num, method = "spearman", use = "pairwise.complete.obs"),
+      error = function(e) NULL
+    )
+    if (is.null(Rb) || any(is.na(Rb))) next
+    
+    # c) Stabilise correlation (ensure PD)
+    Rb <- as.matrix(Matrix::nearPD(Rb, corr = TRUE, keepDiag = TRUE)$mat)
+    
+    # d) EFA: MINRES + geominQ
+    fa_b <- tryCatch(
+      psych::fa(Rb, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(samp)),
+      error = function(e) NULL
+    )
+    if (is.null(fa_b)) next
+    
+    # e) Align loadings to reference orientation
+    L_al <- align_to_ref(fa_b$loadings, L_ref)$L
+    
+    # f) Return vectorized aligned loadings + uniquenesses
+    return(c(as.vector(L_al), fa_b$uniquenesses))
+  }
+}
+close(pb); parallel::stopCluster(cl)
 
-# Step 11 ─ Summarize bootstrap results
-# The distributions of loadings and uniquenesses are summarised by their
-# medians and 95% confidence intervals.  These will later be used for
-# pruning unstable items.
-lambda_boot <- boot_load[, 1:(p*k)]
-psi_boot    <- boot_load[, (p*k+1):(p*k+p)]
-L_median    <- matrix(apply(lambda_boot, 2, median), nrow=p, ncol=k)
-L_ci        <- apply(lambda_boot, 2, quantile, c(.025,.975))
-psi_median  <- apply(psi_boot, 2, median)
-# name dimensions
-vars <- colnames(df_mix2_clean)
+# ---------------------------------------------------------------------------
+# Step 11. Summarize bootstrap results
+# ---------------------------------------------------------------------------
+
+lambda_boot <- boot_load[, 1:(p*k), drop = FALSE]
+psi_boot    <- boot_load[, (p*k+1):(p*k+p), drop = FALSE]
+
+L_median <- matrix(
+  apply(lambda_boot, 2, median),
+  nrow = p, ncol = k, byrow = FALSE,
+  dimnames = list(vars, paste0("F", 1:k))
+)
+L_ci       <- apply(lambda_boot, 2, quantile, c(.025, .975))
+psi_median <- apply(psi_boot,    2, median)
+
+vars <- colnames(df_num)
 rownames(L_median) <- vars
 colnames(L_median) <- paste0("F", 1:k)
 names(psi_median)  <- vars
-# reshape CIs
-ci_arr     <- array(L_ci, dim=c(2,p,k))
-df_L_ci    <- data.frame(
-  variable = rep(vars, each=k),
-  factor   = rep(colnames(L_median), times=p),
-  lower    = as.vector(ci_arr[1,,]),
-  upper    = as.vector(ci_arr[2,,]),
-  stringsAsFactors=FALSE
+
+Fnames <- paste0("F", 1:k)
+
+df_L_ci <- do.call(
+  rbind,
+  lapply(seq_len(k), function(j) {
+    cols <- ((j - 1) * p + 1):(j * p)  # the p columns for factor j
+    data.frame(
+      variable = vars,
+      factor   = Fnames[j],
+      lower    = as.numeric(L_ci[1, cols]),
+      upper    = as.numeric(L_ci[2, cols]),
+      stringsAsFactors = FALSE
+    )
+  })
 )
 
-# build df_psi_ci for the uniqueness‐CI
-psi_ci   <- apply(psi_boot, 2, quantile, c(.025, .975))
-df_psi_ci <- data.frame(
-  variable = vars,
-  lower    = psi_ci[1, ],
-  upper    = psi_ci[2, ],
-  stringsAsFactors = FALSE
-)
+# ---------------------------------------------------------------------------
+# Step 12. Stability-based pruning (KEEP / TENTATIVE / DROP)
+# ---------------------------------------------------------------------------
 
-
-# The bootstrapped summaries remain in memory so they can be used directly
-# without the intermediate CSV round trip.  ``L_median`` and ``df_L_ci`` hold
-# the factor loading medians and confidence intervals, while ``psi_median`` and
-# ``df_psi_ci`` contain the uniqueness summaries.  These objects will feed into
-# the pruning step below.
-
-# Step 12 ─ Prune items via decision-tree rules
-# Variables with unstable or weak loadings are removed to improve factor
-# interpretability.  Primary loadings are defined along with their
-# bootstrapped confidence intervals.
-#   12.1 Identify each variable's primary loading & its 95% CI
-prim_list <- lapply(vars, function(v) {
-  tmp <- df_L_ci[df_L_ci$variable==v, ]
-  loads <- L_median[v,]; fidx <- which.max(abs(loads))
-  data.frame(
-    variable    = v,
-    primary_fac = names(loads)[fidx],
-    median_load = loads[fidx],
-    lower       = tmp$lower[tmp$factor==names(loads)[fidx]],
-    upper       = tmp$upper[tmp$factor==names(loads)[fidx]],
-    stringsAsFactors=FALSE
-  )
-})
-prim_df <- do.call(rbind, prim_list)
-#   12.2 Apply rules: drop if CI crosses 0 AND |median|<.30; mark tentative if ≥.30
-prim_df$cross_zero <- with(prim_df, lower<=0 & upper>=0)
-drop1 <- prim_df$variable[prim_df$cross_zero & abs(prim_df$median_load)<.30]
-tent  <- prim_df$variable[prim_df$cross_zero & abs(prim_df$median_load)>=.30]
-if(length(tent)) message("Tentative (cross-zero but |load|≥.30): ", paste(tent, collapse=", "))
-keep  <- setdiff(vars, drop1)
-message("Dropped (cross-zero & |load|<.30): ", paste(drop1, collapse=", "))
-
-#   12.3 Build pruned Λ and Ψ
-Lambda0 <- L_median[keep, , drop=FALSE]
-Psi0    <- psi_median[keep]
-
-#   12.4 Zero‐out trivial secondaries (<.15)
-if(ncol(Lambda0) > 1) {
-  for(i in seq_len(nrow(Lambda0))) {
-    row <- Lambda0[i,]; idx <- order(abs(row), decreasing=TRUE)
-    sec <- idx[2]
-    if(abs(row[sec]) < .15) Lambda0[i, sec] <- 0
-  }
+# 12.0 Rebuild aligned 3D array: p x k x B_eff
+B_eff <- nrow(lambda_boot)
+L_b   <- array(NA_real_, dim = c(p, k, B_eff),
+               dimnames = list(vars, paste0("F", 1:k), paste0("b", 1:B_eff)))
+for (b in 1:B_eff) {
+  L_b[, , b] <- matrix(lambda_boot[b, ], nrow = p, ncol = k,
+                       dimnames = list(vars, paste0("F", 1:k)))
 }
 
-R_prune <- R_mixed[keep, keep]
+# 12.1 Choose primary factor per item by median |loading|
+median_abs <- apply(abs(L_b), c(1, 2), median)   # p x k
+j_star     <- apply(median_abs, 1, which.max)    # length p
 
-# Step 13 ─ Final pruning based on communality
-# Items whose communality falls below 0.30 after the previous steps are
-# removed.  The resulting correlation matrix feeds into a final bootstrap
-# to compute Tucker's phi and Hancock's H.
-h2   <- rowSums(Lambda0^2)
-drop_comm <- names(h2)[h2<0.3]
-if(length(drop_comm)) message("Dropping low-h² (<.30): ", paste(drop_comm, collapse=", "))
-keep_final <- setdiff(keep, drop_comm)
-Lambda0    <- Lambda0[keep_final, , drop=FALSE]
-Psi0       <- Psi0[keep_final]
-R_prune    <- R_mixed[keep_final, keep_final]
+# 12.2 Bootstrap series on each item's primary factor
+get_series   <- function(i) L_b[i, j_star[i], ]
+series_list  <- lapply(seq_len(p), get_series); names(series_list) <- vars
 
-# (… continue φ/H bootstrap, residual diagnostics, plotting …)
-B         <- 1000
-k         <- ncol(Lambda0)
-phis_rob  <- matrix(NA_real_, B, k)
-Hs_rob    <- matrix(NA_real_, B, k)
-completed <- 0
-attempts  <- 0
+# 12.3 Primary-factor stability across bootstraps
+primary_idx  <- apply(abs(L_b), c(1, 3), which.max)          # p x B_eff
+primary_stab <- sapply(seq_len(p), function(i) mean(primary_idx[i, ] == j_star[i]))
 
-# set up cluster & progress bar
+# 12.4 Salience probability & (diagnostic) sign stability
+salience_cut  <- 0.30
+salience_prob <- sapply(series_list, function(x) mean(abs(x) >= salience_cut, na.rm = TRUE))
+sign_stability <- sapply(series_list, function(x) {
+  s <- sign(x); s[s == 0] <- 1; max(mean(s == 1, na.rm = TRUE), mean(s == -1, na.rm = TRUE))
+})
+
+# 12.5 Median communality proxy (replace with oblique h2 if Φ_b saved)
+h2_med <- sapply(seq_len(p), function(i) median(colSums(L_b[i, , ]^2), na.rm = TRUE))
+
+names(salience_prob) <- vars
+names(primary_stab)  <- vars
+names(h2_med)        <- vars
+
+# 12.6 Thresholds
+th_load_med   <- 0.30
+th_sal_prob   <- 0.75
+th_primary_st <- 0.75
+th_h2_keep    <- 0.20
+th_h2_drop    <- 0.10
+has_MSA <- exists("MSA_i")
+th_msa  <- 0.50
+
+# 12.7 Median |loading| on chosen primary (from L_median)
+med_abs_primary <- sapply(seq_len(p), function(i) abs(L_median[i, j_star[i]]))
+
+# 12.8 Decisions
+keep <- (med_abs_primary >= th_load_med) &
+  (salience_prob    >= th_sal_prob) &
+  (primary_stab     >= th_primary_st) &
+  (h2_med           >= th_h2_keep)
+
+tentative <- (!keep) & (
+  (med_abs_primary >= th_load_med & salience_prob >= 0.60) |
+    (h2_med >= 0.15 & salience_prob >= 0.60) |
+    (primary_stab >= 0.60 & med_abs_primary >= 0.25)
+)
+
+drop <- !(keep | tentative)
+
+# 12.9 Optional MSA backstop
+if (has_MSA) {
+  keep      <- keep      & (MSA_i[vars] >= th_msa)
+  tentative <- tentative & (MSA_i[vars] >= th_msa)
+  drop      <- drop | (MSA_i[vars] < th_msa)
+}
+
+# 12.10 Announce
+msg_items <- function(ix) if (any(ix)) paste(names(ix)[ix], collapse = ", ") else "(none)"
+message("KEEP: ",      msg_items(keep))
+message("TENTATIVE: ", msg_items(tentative))
+message("DROP: ",      msg_items(drop))
+
+# 12.11 Build pruned Λ, Ψ, R (KEEP + TENTATIVE retained, DROP removed)
+keep_or_tent <- names(keep)[keep | tentative]
+Lambda0      <- L_median[keep_or_tent, , drop = FALSE]
+Psi0         <- psi_median[keep_or_tent]
+R_prune      <- R[keep_or_tent, keep_or_tent, drop = FALSE]  # Spearman-only
+
+# 12.12 Iterative post-prune refit and oblique communality backstop
+repeat {
+  fa_pruned <- psych::fa(R_prune, nfactors = ncol(Lambda0), fm = "minres",
+                         rotate = "geominQ", n.obs = nrow(df_num))
+  
+  L_new   <- as.matrix(fa_pruned$loadings)
+  Phi_new <- fa_pruned$Phi
+  h2_new  <- rowSums((L_new %*% Phi_new) * L_new)  # oblique h^2
+  
+  drop_comm <- names(h2_new)[h2_new < th_h2_drop]
+  if (length(drop_comm) == 0) break
+  
+  message("Dropping for very low communality (< ", th_h2_drop, "): ",
+          paste(drop_comm, collapse = ", "))
+  
+  keep_final <- setdiff(rownames(R_prune), drop_comm)
+  # Update to the new, smaller variable set
+  R_prune <- R_prune[keep_final, keep_final, drop = FALSE]
+  Lambda0 <- Lambda0[keep_final, , drop = FALSE]
+  Psi0    <- Psi0[keep_final]
+}
+# If nothing was dropped in the loop, define keep_final now
+if (!exists("keep_final")) keep_final <- rownames(R_prune)
+
+# ---------------------------
+# Step 12b. φ bootstrap only
+# ---------------------------
+B <- 1000
+k <- ncol(Lambda0)
+
 n_cores <- max(1, parallel::detectCores() - 1)
-cl      <- makeCluster(n_cores)
-registerDoSNOW(cl)
+cl      <- parallel::makeCluster(n_cores)
+doSNOW::registerDoSNOW(cl)
 
 pb       <- txtProgressBar(max = B, style = 3)
 progress <- function(n) setTxtProgressBar(pb, n)
 opts     <- list(progress = progress)
 
-# parallel bootstrap + compute φ and H
-# Each iteration refits the factor model on a bootstrap sample and computes
-# Tucker's congruence with the target solution as well as Hancock's H.
-res <- foreach(b = 1:B,
-               .combine    = rbind,
-               .packages   = c("psych","polycor","Matrix"),
-               .options.snow = opts) %dopar% {
-                 repeat {
-                   # a) bootstrap sample of 'keep' cols
-                   samp_idx <- sample(nrow(df_mix2_clean), replace = TRUE)
-                   samp     <- df_mix2_clean[samp_idx, keep_final, drop = FALSE]
-                   
-                   # b) correlation
-                   Rb <- tryCatch(
-                     {
-                       if (COR_METHOD == "mixed") {
-                         hetcor(samp, use = "pairwise.complete.obs")$correlations
-                       } else {
-                         samp_num <- as.data.frame(lapply(samp, as.numeric))
-                         cor(samp_num, method = "spearman", use = "pairwise.complete.obs")
-                       }
-                     },
-                     error = function(e) NULL
-                   )
-                   if (is.null(Rb) || any(is.na(Rb))) next
-                   # Stabilise Rb so ``fa`` does not fail due to non positive-definiteness
-                   Rb <- as.matrix(nearPD(Rb, corr = TRUE)$mat)
-                   
-                   # c) EFA
-                   fa_b <- tryCatch(
-                     fa(Rb,
-                        nfactors = k,
-                        fm       = "minres",
-                        rotate   = "geominQ",
-                        n.obs    = nrow(samp)
-                     ),
-                     error = function(e) NULL
-                   )
-                   if (is.null(fa_b)) next
-                   
-                   # d) compute φ and H
-                   Lb    <- fa_b$loadings
-                   phi_b <- diag(factor.congruence(Lambda0, Lb))
-                   uniqs <- 1 - rowSums(Lb[]^2)
-                   H_b   <- vapply(seq_len(k), function(j) {
-                     num <- sum(Lb[, j])^2
-                     num / (num + sum(uniqs))
-                   }, numeric(1))
-                   
-                   # success — return a single row of length 2*k
-                   return(c(phi_b, H_b))
-                 }
-               }
+phis_res <- foreach::foreach(
+  b = 1:B, .combine = rbind,
+  .packages = c("psych","Matrix","clue"),
+  .export   = c("align_to_ref","Lambda0","k","keep_final")
+  , .options.snow = opts
+) %dopar% {
+  repeat {
+    # a) bootstrap sample on retained variables
+    samp_idx <- sample(nrow(df_num), replace = TRUE)
+    samp     <- df_num[samp_idx, keep_final, drop = FALSE]
+    
+    # b) Spearman correlation and PD repair
+    Rb <- tryCatch(
+      cor(as.data.frame(lapply(samp, as.numeric)),
+          method = "spearman", use = "pairwise.complete.obs"),
+      error = function(e) NULL
+    )
+    if (is.null(Rb) || any(is.na(Rb))) next
+    Rb <- as.matrix(Matrix::nearPD(Rb, corr = TRUE, keepDiag = TRUE)$mat)
+    
+    # c) EFA (MINRES + geominQ)
+    fa_b <- tryCatch(
+      psych::fa(Rb, nfactors = k, fm = "minres",
+                rotate = "geominQ", n.obs = nrow(samp)),
+      error = function(e) NULL
+    )
+    if (is.null(fa_b)) next
+    
+    # d) Align bootstrap loadings to the pruned target Lambda0
+    Lb <- align_to_ref(fa_b$loadings, Lambda0)$L
+    
+    # e) Tucker's congruence (φ) with target
+    phi_b <- diag(psych::factor.congruence(Lambda0, Lb))
+    
+    return(phi_b)   # φ only
+  }
+}
 
-# tear down
-close(pb)
-stopCluster(cl)
+close(pb); parallel::stopCluster(cl)
 
-# 5. unpack results
-phis_rob <- res[,        1:k,    drop = FALSE]
-Hs_rob   <- res[, (k+1):(2*k),    drop = FALSE]
+# Summaries for φ
+phis_rob  <- as.matrix(phis_res)          # B x k
+colnames(phis_rob) <- colnames(Lambda0)
 
-# 6. summarize
-# Average across successful bootstraps
-phi_mean <- colMeans(phis_rob)
-H_mean   <- colMeans(Hs_rob)
+phi_mean  <- colMeans(phis_rob, na.rm = TRUE)
+phi_med   <- apply(phis_rob, 2, median,  na.rm = TRUE)
+phi_ci    <- apply(phis_rob, 2, quantile, probs = c(.025, .975), na.rm = TRUE)
 
-cat(sprintf("Finished %d valid bootstraps\n", nrow(phis_rob)))
-cat("Robust mean Tucker's φ: ", phi_mean, "\n")
-cat("Robust mean Hancock's H:",  H_mean,   "\n")
+cat(sprintf("Finished %d valid φ bootstraps\n", nrow(phis_rob)))
+cat("Mean φ by factor:   ", round(phi_mean, 3), "\n")
+cat("Median φ by factor: ", round(phi_med, 3),  "\n")
+print(t(round(phi_ci, 3)))
+
+
+# PROBABLY CFA
 
 # ---------------------------------------------------------------------------
-# 15. Communalities & Residual Diagnostics
+# Step 15. Communalities & Residual Diagnostics (oblique, from final fit)
 # ---------------------------------------------------------------------------
-# Compute item communalities from the pruned loading matrix.  These give a
-# quick check of how well each retained variable is represented by the
-# extracted factors.
-h2 <- rowSums(Lambda0^2)
-cat("Mean communality (h²):", mean(h2), "\n")
-print(head(data.frame(variable = names(h2), communality = h2), 10))
 
-# Build the uniqueness matrix Ψ from the vector of uniquenesses.  Having a
-# proper diagonal matrix makes later residual calculations clearer.
-Psi_mat <- diag(Psi0)
-rownames(Psi_mat) <- names(Psi0)
-colnames(Psi_mat) <- names(Psi0)
+# At this point, fa_pruned / L_new / Phi_new were produced by the final
+# iteration of Step 12.12 and are guaranteed to match R_prune’s variables.
 
-# Residual correlation matrix: R_resid = R_prune − ΛΛᵀ − Ψ
-resid_mat <- R_prune - (Lambda0 %*% t(Lambda0)) - Psi_mat
+# Oblique communalities: h^2 = λ' Φ λ
+h2 <- rowSums((L_new %*% Phi_new) * L_new)
+cat("Mean communality (h²):", round(mean(h2, na.rm = TRUE), 3), "\n")
+print(head(data.frame(variable = rownames(L_new), communality = h2), 10))
 
-# Overall misfit measured by the root-mean-square residual (RMSR) on the
-# off-diagonal elements only.
-off_diag_vals <- resid_mat[lower.tri(resid_mat)]
-RMSR <- sqrt(mean(off_diag_vals^2))
-cat("RMSR =", round(RMSR, 4), "\n")
+# Uniquenesses and Psi
+Psi_vec <- fa_pruned$uniquenesses
+Psi_mat <- diag(Psi_vec)
+rownames(Psi_mat) <- names(Psi_vec)
+colnames(Psi_mat) <- names(Psi_vec)
 
-# Identify any residuals with absolute value greater than 0.10, which can
-# highlight local areas of poor fit.
-off_idx <- which(abs(resid_mat) > 0.10, arr.ind = TRUE)
+# Model-implied correlation: Σ_hat = Λ Φ Λ' + Ψ
+Sigma_hat <- L_new %*% Phi_new %*% t(L_new) + Psi_mat
+
+# --- Safety alignment in case column orders drifted upstream ---
+common <- intersect(rownames(R_prune), rownames(Sigma_hat))
+if (length(common) < nrow(R_prune)) {
+  warning("Aligning Sigma_hat to R_prune by common variables: ",
+          paste(setdiff(rownames(R_prune), common), collapse = ", "))
+}
+R_prune   <- R_prune[common, common, drop = FALSE]
+Sigma_hat <- Sigma_hat[common, common, drop = FALSE]
+# ----------------------------------------------------------------
+
+# Residuals and RMSR
+resid_mat       <- R_prune - Sigma_hat
+diag(resid_mat) <- 0
+
+off_diag_vals <- resid_mat[lower.tri(resid_mat, diag = FALSE)]
+RMSR <- sqrt(mean(off_diag_vals^2, na.rm = TRUE))
+cat("RMSR (off-diagonal) =", round(RMSR, 4), "\n")
+
+# Flag residuals with |residual| > 0.10
+thr_resid <- 0.10
+off_idx <- which(abs(resid_mat) > thr_resid & row(resid_mat) > col(resid_mat), arr.ind = TRUE)
 if (nrow(off_idx) > 0) {
   offenders <- data.frame(
     var1     = rownames(resid_mat)[off_idx[,1]],
     var2     = colnames(resid_mat)[off_idx[,2]],
     residual = resid_mat[off_idx]
   )
-  cat("Residuals exceeding |.10|:\n")
+  cat("Residuals exceeding |", thr_resid, "|:\n", sep = "")
   print(offenders)
 } else {
-  cat("No residuals exceed |0.10|.\n")
+  cat("No residuals exceed |", thr_resid, "|.\n", sep = "")
 }
 
-# Visualise the residual matrix with a heatmap for an at-a-glance view of
-# where correlations are over- or under-estimated by the factor model.
+# Heatmap (oblique residuals)
 df_long <- reshape2::melt(resid_mat, varnames = c("Row", "Col"),
                           value.name = "Residual")
-ggplot(df_long, aes(x = Col, y = Row, fill = Residual)) +
-  geom_tile() +
-  scale_fill_gradient2(
-    low      = "blue",
-    mid      = "white",
-    high     = "red",
-    midpoint = 0
+ggplot2::ggplot(df_long, ggplot2::aes(x = Col, y = Row, fill = Residual)) +
+  ggplot2::geom_tile() +
+  ggplot2::scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  ggplot2::geom_text(ggplot2::aes(label = round(Residual, 2)), size = 2.5) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
+    axis.text.y = ggplot2::element_text(size = 8),
+    panel.grid  = ggplot2::element_blank()
   ) +
-  geom_text(aes(label = round(Residual, 2)), size = 2.5) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    axis.text.y = element_text(size = 8),
-    panel.grid  = element_blank()
+  ggplot2::labs(fill = "Residual")
+
+# ---------------------------------------------------------------------------
+# 16. Restrict summaries to final kept items + assemble a consolidated EFA report
+# ---------------------------------------------------------------------------
+
+# a) Filter CIs to the final kept variables
+df_L_ci_pruned <- dplyr::filter(df_L_ci, variable %in% keep_final)
+
+# b) Pruned median loading matrix (aligned medians from bootstrap)
+L_median_pruned <- L_median[keep_final, , drop = FALSE]
+
+# c) Map each variable to its primary factor (j_star from Step 12)
+j_map <- setNames(j_star, vars)                   # index 1..k for all vars
+j_keep <- j_map[keep_final]
+pf_keep <- paste0("F", j_keep)                   # "F1"... labels
+
+# d) Pull the primary-factor CI row for each kept variable
+primary_rows <- do.call(
+  rbind,
+  lapply(seq_along(keep_final), function(i) {
+    v  <- keep_final[i]
+    jf <- pf_keep[i]                              # factor name
+    # median loading (signed) on primary from L_median_pruned
+    med <- L_median_pruned[v, jf]
+    # CI for primary factor from df_L_ci_pruned
+    ci_row <- df_L_ci_pruned[df_L_ci_pruned$variable == v & df_L_ci_pruned$factor == jf, ]
+    # safety if CI was missing (shouldn't happen if factors match)
+    if (nrow(ci_row) == 0) ci_row <- data.frame(lower = NA_real_, upper = NA_real_)
+    data.frame(variable = v, primary_factor = jf,
+               median_loading = med,
+               lower = ci_row$lower, upper = ci_row$upper,
+               stringsAsFactors = FALSE)
+  })
+)
+
+# e) Bring in stability & communality diagnostics from Step 12 + final refit
+#    - salience_prob, primary_stab, h2_med were named by variable in Step 12
+sal_keep  <- salience_prob[keep_final]
+pst_keep  <- primary_stab[keep_final]
+h2_med_k  <- h2_med[keep_final]                 # orthogonal proxy (bootstrap median)
+h2_obl_k  <- h2_new[keep_final]                 # final oblique h^2 from fa_pruned
+
+# f) Consolidated EFA report table
+efa_report <- dplyr::as_tibble(primary_rows) |>
+  dplyr::mutate(
+    salience_prob   = as.numeric(sal_keep[variable]),
+    primary_stab    = as.numeric(pst_keep[variable]),
+    h2_med_boot     = as.numeric(h2_med_k[variable]),
+    h2_oblique_final= as.numeric(h2_obl_k[variable]),
+    ci_cross_zero   = (lower <= 0 & upper >= 0),
+    abs_median      = abs(median_loading)
+  ) |>
+  dplyr::arrange(primary_factor, dplyr::desc(abs_median))
+
+# g) Print a compact report and overall factor-level φ summary (from Step 12b)
+cat("\n=== Consolidated EFA Report (final kept items) ===\n")
+print(dplyr::select(
+  efa_report, variable, primary_factor, median_loading, lower, upper,
+  salience_prob, primary_stab, h2_med_boot, h2_oblique_final, ci_cross_zero
+))
+
+cat("\n=== Factor-level congruence (φ) summary ===\n")
+cat("Mean φ by factor:   ", paste(names(phi_mean), round(phi_mean, 3), sep="=", collapse="  "), "\n")
+cat("Median φ by factor: ", paste(names(phi_med),  round(phi_med,  3), sep="=", collapse="  "), "\n")
+print(t(round(phi_ci, 3)))
+
+# ---------------------------------------------------------------------------
+# 17. Stability & cross-loading summaries (pruned set)
+# ---------------------------------------------------------------------------
+
+# 17a) Unstable primary loadings = primary CI crosses zero
+unstable_primary <- dplyr::filter(efa_report, ci_cross_zero)
+cat("\n=== Unstable primary loadings (primary CI spans 0) ===\n")
+if (nrow(unstable_primary)) print(unstable_primary[, c("variable","primary_factor","median_loading","lower","upper")]) else cat("(none)\n")
+
+# 17b) Cross-loading candidates = variables with ≥2 factors whose CI excludes 0
+cross_pruned <- df_L_ci_pruned |>
+  dplyr::mutate(nonzero = (lower > 0 | upper < 0)) |>
+  dplyr::filter(nonzero) |>
+  dplyr::group_by(variable) |>
+  dplyr::summarise(
+    n_factors = dplyr::n(),
+    intervals = paste0(factor, "[", round(lower, 2), ",", round(upper, 2), "]", collapse = "; "),
+    .groups = "drop"
+  ) |>
+  dplyr::filter(n_factors > 1)
+
+cat("\n=== Cross-loading candidates (≥ 2 non-zero CIs) ===\n")
+if (nrow(cross_pruned)) print(cross_pruned) else cat("(none)\n")
+
+# 17c) Strong labeling candidates = primary CI entirely beyond ±0.30
+label_pruned <- efa_report |>
+  dplyr::filter(lower >= 0.30 | upper <= -0.30) |>
+  dplyr::arrange(primary_factor, dplyr::desc(abs_median))
+
+cat("\n=== Labeling candidates (primary CI beyond ±0.30) ===\n")
+if (nrow(label_pruned)) print(label_pruned[, c("variable","primary_factor","median_loading","lower","upper")]) else cat("(none)\n")
+
+# ---------------------------------------------------------------------------
+# 18. CI errorbar plot (primary factor only, pruned set)
+# ---------------------------------------------------------------------------
+
+# Order variables: by primary factor, then by |median loading|
+efa_report$var_order <- seq_len(nrow(efa_report))
+efa_report <- efa_report |>
+  dplyr::arrange(primary_factor, dplyr::desc(abs_median)) |>
+  dplyr::mutate(variable_f = factor(variable, levels = variable))
+
+ggplot2::ggplot(
+  efa_report,
+  ggplot2::aes(x = variable_f, y = median_loading, ymin = lower, ymax = upper, colour = primary_factor)
+) +
+  ggplot2::geom_errorbar(width = 0.2, position = ggplot2::position_dodge(width = 0.6)) +
+  ggplot2::geom_point(size = 2, position = ggplot2::position_dodge(width = 0.6)) +
+  ggplot2::geom_hline(yintercept = 0, linetype = 2) +
+  ggplot2::coord_flip() +
+  ggplot2::labs(
+    x = NULL,
+    y = "Primary median loading ±95% CI",
+    title = "Pruned Items: Primary Factor Loadings with 95% Bootstrap CIs"
   ) +
-  labs(fill = "Residual")
+  ggplot2::theme_minimal() +
+  ggplot2::theme(legend.position = "bottom")
 
 # ---------------------------------------------------------------------------
-# 16. Restrict all summaries & plots to the pruned items
+# 19. Heatmap of pruned median loadings (grouped by primary factor)
 # ---------------------------------------------------------------------------
-df_L_ci_pruned <- df_L_ci %>%
-  filter(variable %in% keep_final)
 
-L_median_pruned <- Lambda0
-colnames(L_median_pruned) <- colnames(Lambda0)
-rownames(L_median_pruned) <- keep_final
-
-# ---------------------------------------------------------------------------
-# 17. Summaries on pruned loadings
-# ---------------------------------------------------------------------------
-# Variables whose confidence interval spans zero are considered unstable.
-unstable_pruned <- df_L_ci_pruned %>%
-  filter(lower <= 0 & upper >= 0)
-cat("=== Pruned unstable loadings (CI spans 0) ===\n")
-print(unstable_pruned)
-
-# Identify cross-loading candidates: variables with non-zero CIs on more than
-# one factor.
-cross_pruned <- df_L_ci_pruned %>%
-  mutate(nonzero = (lower > 0 | upper < 0)) %>%
-  filter(nonzero) %>%
-  group_by(variable) %>%
-  summarise(
-    n_factors = n(),
-    intervals = paste0(factor, "[", round(lower, 2), ",", round(upper, 2), "]",
-                       collapse = "; ")
-  ) %>%
-  filter(n_factors > 1)
-cat("\n=== Pruned cross-loading candidates ===\n")
-print(cross_pruned)
-
-# Candidate labels: loadings whose entire CI lies beyond ±0.30.
-label_pruned <- df_L_ci_pruned %>%
-  filter(lower >= 0.30 | upper <= -0.30) %>%
-  arrange(factor, desc(abs((lower + upper) / 2)))
-cat("\n=== Pruned labeling candidates (CI beyond ±0.30) ===\n")
-print(label_pruned)
-
-# ---------------------------------------------------------------------------
-# 18. CI-errorbar plot for pruned loadings
-# ---------------------------------------------------------------------------
-ggplot(df_L_ci_pruned,
-       aes(x = reorder(variable, (lower + upper) / 2),
-           y = (lower + upper) / 2, ymin = lower, ymax = upper,
-           colour = factor)) +
-  geom_errorbar(position = position_dodge(width = 0.6), width = 0.2) +
-  geom_point(position = position_dodge(width = 0.6), size = 2) +
-  coord_flip() +
-  labs(
-    x     = NULL,
-    y     = "Median loading ±95% CI",
-    title = "Pruned: Bootstrapped 95% CIs for Factor Loadings"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-
-# ---------------------------------------------------------------------------
-# 19. Heatmap of pruned median loadings
-# ---------------------------------------------------------------------------
+# Long format for heatmap
 L_df_pruned <- as.data.frame(L_median_pruned)
 L_df_pruned$variable <- rownames(L_df_pruned)
+L_long_pruned <- tidyr::pivot_longer(L_df_pruned, -variable, names_to = "factor", values_to = "loading")
 
-L_long_pruned <- L_df_pruned %>%
-  pivot_longer(-variable, names_to = "factor", values_to = "loading")
+# Add primary factor & ordering to group rows in the heatmap
+pf_df <- efa_report[, c("variable","primary_factor","abs_median")]
+L_long_pruned <- dplyr::left_join(L_long_pruned, pf_df, by = "variable")
 
-ggplot(L_long_pruned, aes(x = factor, y = variable, fill = loading)) +
-  geom_tile() +
-  scale_fill_gradient2(
-    low      = "blue",
-    mid      = "white",
-    high     = "red",
-    midpoint = 0,
-    name     = "Loading"
+# Order variables within primary factor by |median loading|
+var_levels <- efa_report$variable  # already ordered by factor then |loading|
+L_long_pruned$variable_f <- factor(L_long_pruned$variable, levels = var_levels)
+
+ggplot2::ggplot(L_long_pruned, ggplot2::aes(x = factor, y = variable_f, fill = loading)) +
+  ggplot2::geom_tile() +
+  ggplot2::scale_fill_gradient2(
+    low = "blue", mid = "white", high = "red", midpoint = 0, name = "Loading"
   ) +
-  labs(
-    title = "Pruned: Median Factor Loadings Heatmap",
-    x     = NULL,
-    y     = NULL
+  ggplot2::labs(
+    title = "Pruned: Median Factor Loadings (aligned, bootstrap medians)",
+    x = NULL, y = NULL
   ) +
-  theme_minimal() +
-  theme(
-    axis.text.x    = element_text(angle = 45, hjust = 1),
-    axis.text.y    = element_text(size = 8),
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    axis.text.x    = ggplot2::element_text(angle = 45, hjust = 1),
+    axis.text.y    = ggplot2::element_text(size = 8),
     legend.position = "right"
   )
+
 
 # ---------------------------------------------------------------------------
 # 20a. Pre-CFA diagnostic checks
