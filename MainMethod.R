@@ -221,6 +221,12 @@ align_to_ref <- function(L, L_ref, Phi = NULL) {
 fa_ref <- psych::fa(R, nfactors = k, fm = "minres", rotate = "geominQ", n.obs = nrow(df_num))
 L_ref  <- as.matrix(fa_ref$loadings)   # p x k
 
+# Ensure k exists here
+stopifnot(exists("k"), is.numeric(k), length(k) == 1L, k >= 1)
+
+# Standardize factor names globally to F1..Fk (prevents MR1/MR2 drift)
+colnames(L_ref) <- paste0("F", seq_len(k))
+
 # Bootstrap EFA (Spearman-only)
 p <- ncol(df_num)
 B <- 1000
@@ -271,31 +277,49 @@ close(pb); parallel::stopCluster(cl)
 # Step 11. Summarize bootstrap results
 # ---------------------------------------------------------------------------
 
-lambda_boot <- boot_load[, 1:(p*k), drop = FALSE]
-psi_boot    <- boot_load[, (p*k+1):(p*k+p), drop = FALSE]
+# Split the stacked bootstrap results into loadings and uniquenesses
+lambda_boot <- as.matrix(boot_load[, seq_len(p * k), drop = FALSE])
+psi_boot    <- as.matrix(boot_load[, (p * k + 1):(p * k + p), drop = FALSE])
 
+# Item (row) names
+item_names <- if (exists("keep_final") && length(keep_final) == p) {
+  as.character(keep_final)
+} else if (!is.null(rownames(R))) {
+  rownames(R)
+} else if (!is.null(colnames(R))) {
+  colnames(R)
+} else {
+  paste0("V", seq_len(p))
+}
+
+# Factor (column) names — use the standardized F1..Fk
+factor_names <- paste0("F", seq_len(k))
+
+# Median loadings (reshape to p x k) and assign dimnames
 L_median <- matrix(
-  apply(lambda_boot, 2, median),
-  nrow = p, ncol = k, byrow = FALSE,
-  dimnames = list(vars, paste0("F", 1:k))
+  apply(lambda_boot, 2, stats::median, na.rm = TRUE),
+  nrow = p, ncol = k, byrow = FALSE
 )
-L_ci       <- apply(lambda_boot, 2, quantile, c(.025, .975))
-psi_median <- apply(psi_boot,    2, median)
+dimnames(L_median) <- list(item_names, factor_names)
 
-vars <- colnames(df_num)
-rownames(L_median) <- vars
-colnames(L_median) <- paste0("F", 1:k)
-names(psi_median)  <- vars
+# Median uniquenesses (Ψ)
+psi_median <- apply(psi_boot, 2, stats::median, na.rm = TRUE)
+names(psi_median) <- item_names
 
-Fnames <- paste0("F", 1:k)
+# Keep a simple alias used elsewhere
+vars <- item_names
 
+# 95% CIs for each loading, stacked by factor (use the same factor names)
+L_ci <- apply(lambda_boot, 2, stats::quantile, c(.025, .975), na.rm = TRUE)
+
+Fnames <- factor_names  # <- ensure match with L_median colnames
 df_L_ci <- do.call(
   rbind,
   lapply(seq_len(k), function(j) {
-    cols <- ((j - 1) * p + 1):(j * p)  # the p columns for factor j
+    cols <- ((j - 1L) * p + 1L):(j * p)
     data.frame(
       variable = vars,
-      factor   = Fnames[j],
+      factor   = rep(Fnames[j], p),   # character, not factor
       lower    = as.numeric(L_ci[1, cols]),
       upper    = as.numeric(L_ci[2, cols]),
       stringsAsFactors = FALSE
@@ -428,7 +452,7 @@ opts     <- list(progress = progress)
 phis_res <- foreach::foreach(
   b = 1:B, .combine = rbind,
   .packages = c("psych","Matrix","clue"),
-  .export   = c("align_to_ref","Lambda0","k","keep_final")
+  .export   = c("align_to_ref","Lambda0","k","keep_final", "df_num")
   , .options.snow = opts
 ) %dopar% {
   repeat {
@@ -560,29 +584,41 @@ df_L_ci_pruned <- dplyr::filter(df_L_ci, variable %in% keep_final)
 # b) Pruned median loading matrix (aligned medians from bootstrap)
 L_median_pruned <- L_median[keep_final, , drop = FALSE]
 
-# c) Map each variable to its primary factor (j_star from Step 12)
-j_map <- setNames(j_star, vars)                   # index 1..k for all vars
-j_keep <- j_map[keep_final]
-pf_keep <- paste0("F", j_keep)                   # "F1"... labels
+# c) Map each variable to its primary factor index (j_star) and names
+# j_star is length p (over 'vars'); align to keep_final
+j_map  <- setNames(j_star, vars)      # index 1..k for all vars
+j_keep <- as.integer(j_map[keep_final])
+# Use the ACTUAL column names of L_median_pruned to avoid "F1" vs "MR1" mismatches
+L_median_pruned <- L_median[keep_final, , drop = FALSE]
+pf_keep <- colnames(L_median_pruned)[j_keep]   # e.g., "F1","F2",...
 
 # d) Pull the primary-factor CI row for each kept variable
+df_L_ci_pruned <- dplyr::filter(df_L_ci, variable %in% keep_final)
+
+# Sanity checks to catch naming misalignments early
+stopifnot(all(pf_keep %in% colnames(L_median_pruned)))
+stopifnot(all(df_L_ci_pruned$factor %in% colnames(L_median_pruned)))
+
 primary_rows <- do.call(
   rbind,
   lapply(seq_along(keep_final), function(i) {
     v  <- keep_final[i]
-    jf <- pf_keep[i]                              # factor name
+    jf <- pf_keep[i]                                # factor name (matches columns)
     # median loading (signed) on primary from L_median_pruned
-    med <- L_median_pruned[v, jf]
+    med <- L_median_pruned[v, jf, drop = TRUE]
     # CI for primary factor from df_L_ci_pruned
     ci_row <- df_L_ci_pruned[df_L_ci_pruned$variable == v & df_L_ci_pruned$factor == jf, ]
-    # safety if CI was missing (shouldn't happen if factors match)
-    if (nrow(ci_row) == 0) ci_row <- data.frame(lower = NA_real_, upper = NA_real_)
-    data.frame(variable = v, primary_factor = jf,
-               median_loading = med,
-               lower = ci_row$lower, upper = ci_row$upper,
-               stringsAsFactors = FALSE)
+    if (nrow(ci_row) == 0L) ci_row <- data.frame(lower = NA_real_, upper = NA_real_)
+    data.frame(
+      variable = v,
+      primary_factor = jf,
+      median_loading = as.numeric(med),
+      lower = ci_row$lower, upper = ci_row$upper,
+      stringsAsFactors = FALSE
+    )
   })
 )
+
 
 # e) Bring in stability & communality diagnostics from Step 12 + final refit
 #    - salience_prob, primary_stab, h2_med were named by variable in Step 12
@@ -707,509 +743,488 @@ ggplot2::ggplot(L_long_pruned, ggplot2::aes(x = factor, y = variable_f, fill = l
   )
 
 # =============================================================================
-# 20. Bridge EFA -> CFA (helpers + clean handoff)
-# Paste this whole block right after Step 19.
-# Requires: Lambda0 (pruned loadings), df_mix2_clean (full typed data)
+# 20. CFA
 # =============================================================================
 
-# --- Light deps guard (don’t error if optional pkgs missing) ---
-need_pkg <- function(p) if (!requireNamespace(p, quietly = TRUE))
-  stop(sprintf("Package '%s' is required.", p))
-invisible(lapply(c("lavaan","ggplot2","reshape2"), need_pkg))
-if (!requireNamespace("semPlot", quietly = TRUE)) message("[Note] 'semPlot' not installed; path diagram skipped.")
-if (!requireNamespace("foreach", quietly = TRUE)) message("[Note] 'foreach' not installed; parallel bootstraps skipped.")
-if (!requireNamespace("doSNOW", quietly = TRUE)) message("[Note] 'doSNOW' not installed; parallel bootstraps skipped.")
-if (!requireNamespace("parallel", quietly = TRUE)) message("[Note] 'parallel' not installed; parallel bootstraps skipped.")
-if (!requireNamespace("ltm", quietly = TRUE)) message("[Note] 'ltm' not installed; point-biserial correlation skipped.")
+## 1. Determine the variable set ----
 
-# --- Short utilities (wrap repeated code paths) ---
-safe_cfa <- function(model, data, ordered = character(0), std.lv = TRUE, est = "WLSMV") {
-  tryCatch(lavaan::cfa(model, data = data, std.lv = std.lv, estimator = est, ordered = ordered),
-           error = function(e) { cat("[CFA ERROR]\n"); print(e); NULL })
+loading_matrix <- L_new
+
+factor_names <- colnames(loading_matrix)
+if (is.null(factor_names) || length(factor_names) == 0) {
+  factor_names <- paste0("F", seq_len(ncol(loading_matrix)))
+  colnames(loading_matrix) <- factor_names
 }
-fit_print <- function(fit, label="[FIT]") {
-  cat("\n", label, " Fit indices:\n", sep="")
-  print(lavaan::fitMeasures(fit, c("chisq","df","cfi","rmsea","srmr")))
+cfa_vars <- rownames(loading_matrix)
+if (is.null(cfa_vars) || length(cfa_vars) == 0) {
+  stop("Loading matrix must have row names corresponding to variables.")
 }
-std_lambda <- function(fit) lavaan::inspect(fit, "std")$lambda
-plot_resid_heatmap <- function(fit, main) {
-  rr <- lavaan::residuals(fit, type = "cor")
-  if (is.list(rr) && "cov" %in% names(rr)) stats::heatmap(rr$cov, main = main, symm = TRUE)
+
+## 2. Extract the relevant data and infer variable types ----
+# Extract only the variables used in the CFA from the full mixed dataset.  A
+# safety check ensures all are present.
+missing_vars <- setdiff(cfa_vars, names(df_num))
+if (length(missing_vars) > 0) {
+  stop("The following variables required by the CFA are missing from df_num: ",
+       paste(missing_vars, collapse = ", "))
 }
-semplot_pdf <- function(fit, file) {
-  if (!requireNamespace("semPlot", quietly = TRUE)) return(invisible(NULL))
-  pdf(file, width=10, height=8); on.exit(dev.off(), add=TRUE)
-  semPlot::semPaths(fit, "std", whatLabels="std", edge.label.cex=1.05, layout="tree", style="lisrel")
-}
-mi_refine <- function(model_txt, data, ordered, max_steps=5, th=10) {
-  added <- character(0)
-  fit   <- safe_cfa(model_txt, data, ordered)
-  if (is.null(fit)) return(list(model=model_txt, fit=NULL, added=added))
-  for (s in seq_len(max_steps)) {
-    mi <- lavaan::modindices(fit)
-    mi <- mi[order(-mi$mi), ]
-    mi <- subset(mi, mi > th & !(op %in% c("~1","~")))
-    mi <- mi[!paste(mi$lhs, mi$op, mi$rhs) %in% added, ]
-    if (!nrow(mi)) { cat("\n[MI-REFINEMENT] No MI >", th, " left.\n"); break }
-    top <- mi[1, ]; new_line <- paste(top$lhs, top$op, top$rhs)
-    cat(sprintf("[MI-REFINEMENT] Step %d: add '%s' (MI=%.2f)\n", s, new_line, top$mi))
-    model_txt <- paste(model_txt, new_line, sep="\n"); added <- c(added, new_line)
-    fit2 <- safe_cfa(model_txt, data, ordered); if (!is.null(fit2)) fit <- fit2
-    fit_print(fit, sprintf("[MI-REFINEMENT %d]", s))
+cfa_df <- df_num[, cfa_vars, drop = FALSE]
+
+# Determine which variables are continuous and which are ordered.  For
+# continuous variables we rely on R's class (numeric/integer); for ordered
+# variables we check if they are factors or ordered factors.  The user may
+# override these defaults by adjusting the lists before fitting.
+is_num    <- sapply(cfa_df, is.numeric)
+is_ord    <- sapply(cfa_df, function(x) inherits(x, c("factor", "ordered")))
+ordered_items <- names(cfa_df)[is_ord]
+cont_vars     <- names(cfa_df)[is_num]
+
+message("[CFA] Variable classes:")
+print(sapply(cfa_df, class))
+message("[CFA] Continuous variables:")
+print(cont_vars)
+message("[CFA] Ordered/ordinal variables:")
+print(ordered_items)
+
+# Check for constant variables (all values identical or all NA) and warn.
+for (v in names(cfa_df)) {
+  vals <- na.omit(cfa_df[[v]])
+  if (length(unique(vals)) <= 1) {
+    warning(sprintf("Variable %s is constant or has no variability.", v))
   }
-  list(model=model_txt, fit=fit, added=added)
 }
-collapse_sparse_categories <- function(data, var, min_count=5) {
-  if (!var %in% names(data)) return(data)
-  x <- data[[var]]; if (!is.factor(x) && !is.ordered(x)) return(data)
-  tab <- table(x, useNA="ifany"); sparse <- names(tab)[tab < min_count]
-  if (!length(sparse)) return(data)
-  new <- as.character(x)
-  if (is.ordered(x)) {
-    lv <- levels(x); num <- suppressWarnings(as.numeric(lv))
-    if (all(is.finite(num)) && length(lv) >= 4) {
-      new[new %in% c("1","2")] <- "1-2"; new[new %in% c("4","5")] <- "4-5"
-      data[[var]] <- factor(new, levels=c("1-2","3","4-5"), ordered=TRUE)
-    } else {
-      for (lev in sparse) {
-        k <- which(levels(x)==lev); tgt <- ifelse(k>1, levels(x)[k-1], levels(x)[min(k+1, length(levels(x)))])
-        new[new==lev] <- tgt
-      }
-      data[[var]] <- factor(new, levels=unique(new), ordered=TRUE)
+
+# Check for near perfect correlations among continuous variables and warn.
+if (length(cont_vars) > 1) {
+  cor_mat <- suppressWarnings(stats::cor(cfa_df[cont_vars], use = "pairwise.complete.obs"))
+  high_corrs <- which(abs(cor_mat) > 0.95 & abs(cor_mat) < 1, arr.ind = TRUE)
+  if (nrow(high_corrs) > 0) {
+    message("[CFA WARNING] High correlations (>0.95) detected among continuous variables:")
+    for (k in seq_len(nrow(high_corrs))) {
+      i1 <- rownames(cor_mat)[high_corrs[k, 1]]
+      i2 <- colnames(cor_mat)[high_corrs[k, 2]]
+      message(sprintf("  • %s and %s: %.3f", i1, i2, cor_mat[high_corrs[k, 1], high_corrs[k, 2]]))
     }
-  } else {
-    new[new %in% sparse] <- "Other"
-    data[[var]] <- factor(new, levels=c(setdiff(levels(x), sparse), "Other"))
   }
-  data
 }
 
-# --- Hand-off objects from EFA ---
-cfa_vars <- rownames(Lambda0)
-if (!exists("df_num")) stop("Missing 'df_num' (typed mixed-mode data) for CFA.")
-missing_cfa <- setdiff(cfa_vars, names(df_num))
-if (length(missing_cfa)) stop("[CFA] Variables missing in data: ", paste(missing_cfa, collapse=", "))
-cfa_df <- df_num[, cfa_vars, drop=FALSE]
+## 3. Preprocessing: scale continuous variables and coerce ordered ----
 
-# Explicit lists (kept) → intersect with data
-all_cont_vars <- c(
-  "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous",
-  "Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous",
-  "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous",
-  "Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous",
-  "Q0__hope_total__continuous","Q0__self_control_score__continuous",
-  "Q5__AgeYears__continuous","Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous"
-)
-all_ordered_items <- c(
-  "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal",
-  "Q0__average_of_farming_practices__ordinal",
-  "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
-)
-cont_vars    <- intersect(all_cont_vars, names(cfa_df))
-ordered_items <- intersect(all_ordered_items, names(cfa_df))
+# helper: coerce any vector to numeric safely
+.to_numeric <- function(x) {
+  if (is.numeric(x)) return(x)
+  if (is.factor(x) || is.ordered(x)) return(as.numeric(x))            # factor codes
+  if (is.logical(x)) return(as.numeric(x))
+  # last resort: try character -> numeric
+  suppressWarnings(as.numeric(as.character(x)))
+}
 
-# Coerce/scale as you did
-for (v in cont_vars) if (!is.numeric(cfa_df[[v]])) cfa_df[[v]] <- as.numeric(cfa_df[[v]])
-if (length(cont_vars)) cfa_df[cont_vars] <- scale(cfa_df[cont_vars])
-for (v in ordered_items) if (!is.ordered(cfa_df[[v]]))
-  cfa_df[[v]] <- ordered(cfa_df[[v]], levels = sort(unique(cfa_df[[v]])))
+if (length(cont_vars) > 0) {
+  # 1) make a numeric data.frame
+  num_df <- as.data.frame(lapply(cfa_df[cont_vars], .to_numeric), 
+                          stringsAsFactors = FALSE)
+  
+  # 2) mean-center everything
+  means <- sapply(num_df, function(v) mean(v, na.rm = TRUE))
+  centered <- sweep(num_df, 2, means, FUN = "-")
+  
+  # 3) scale by SD where possible (avoid divide-by-zero for constant cols)
+  sds <- sapply(num_df, function(v) sd(v, na.rm = TRUE))
+  ok  <- is.finite(sds) & sds > .Machine$double.eps
+  
+  scaled <- centered
+  if (any(ok)) {
+    scaled[, ok] <- sweep(centered[, ok, drop = FALSE], 2, sds[ok], FUN = "/")
+  }
+  # columns with zero variance are left mean-centered only
+  
+  # 4) put back
+  colnames(scaled) <- cont_vars
+  cfa_df[cont_vars] <- scaled
+}
 
-# Create model syntax directly from Lambda0
-cfa_model_lines <- sapply(seq_len(ncol(Lambda0)), function(j) {
-  f <- colnames(Lambda0)[j]
-  its <- rownames(Lambda0)[abs(Lambda0[, j]) > 0]
-  if (length(its)) paste(f, "=~", paste(its, collapse = " + ")) else NULL
+# make ordered variables truly ordered (do NOT include them in cont_vars)
+if (length(ordered_items) > 0) {
+  for (v in ordered_items) {
+    if (!is.ordered(cfa_df[[v]])) {
+      cfa_df[[v]] <- ordered(cfa_df[[v]], levels = sort(unique(cfa_df[[v]])))
+    }
+  }
+}
+
+# --- Helpers used later (safe CFA fit, compact fit print, sparse collapse) ---
+if (!exists("safe_cfa")) {
+  safe_cfa <- function(model_text, data, ordered_vars = NULL) {
+    est <- if (!is.null(ordered_vars) && length(ordered_vars) > 0) "WLSMV" else "MLR"
+    ord <- if (!is.null(ordered_vars) && length(ordered_vars) > 0) ordered_vars else NULL
+    tryCatch(
+      lavaan::cfa(model = model_text, data = data, std.lv = TRUE, estimator = est, ordered = ord),
+      error = function(e) { message("[safe_cfa] ", e$message); return(NULL) }
+    )
+  }
+}
+
+if (!exists("fit_print")) {
+  fit_print <- function(fit, tag = "[CFA]") {
+    if (is.null(fit)) { message(tag, " fit is NULL"); return(invisible(NULL)) }
+    fm <- lavaan::fitMeasures(fit, c("chisq","df","pvalue","cfi","tli","rmsea","srmr"))
+    cat(sprintf("%s χ²(%d)=%.2f, p=%.3f; CFI=%.3f, TLI=%.3f, RMSEA=%.3f, SRMR=%.3f\n",
+                tag, as.integer(fm["df"]), fm["chisq"], fm["pvalue"],
+                fm["cfi"], fm["tli"], fm["rmsea"], fm["srmr"]))
+  }
+}
+
+if (!exists("collapse_sparse_categories")) {
+  collapse_sparse_categories <- function(data, var_name, min_count = 5) {
+    if (!var_name %in% names(data)) return(data)
+    x <- data[[var_name]]
+    if (!is.factor(x) && !is.ordered(x)) return(data)
+    tab <- table(x, useNA = "no")
+    sparse <- names(tab)[tab < min_count]
+    if (!length(sparse)) return(data)
+    y <- as.character(x)
+    # simple adjacent collapsing for ordered; "Other" for nominal
+    if (is.ordered(x)) {
+      lev <- levels(x)
+      for (lv in sparse) {
+        pos <- match(lv, lev)
+        repl <- if (!is.na(pos) && pos > 1) lev[pos - 1] else if (!is.na(pos) && pos < length(lev)) lev[pos + 1] else lv
+        y[y == lv] <- repl
+      }
+      data[[var_name]] <- ordered(y, levels = unique(y))
+    } else {
+      y[y %in% sparse] <- "Other"
+      data[[var_name]] <- factor(y)
+    }
+    data
+  }
+}
+
+## 4. Construct the CFA model syntax from the EFA loadings ----
+# By default: one primary factor per item (simple structure).
+# Optionally allow cross-loadings above 'cfa_cross_threshold' (e.g., 0.30).
+
+cfa_cross_threshold <- get0("cfa_cross_threshold", ifnotfound = NA_real_) # set to 0.30 if you want
+Lmat <- as.matrix(loading_matrix)
+rownames(Lmat) <- cfa_vars
+colnames(Lmat) <- factor_names
+
+# Primary factor = argmax |loading| for each item
+j_primary <- apply(abs(Lmat), 1, which.max)  # integer in 1..k
+tab_primary <- table(factor(j_primary, levels = seq_len(ncol(Lmat))))
+if (any(tab_primary < 2)) {
+  message("[CFA WARNING] Some factors have < 2 primary indicators: ",
+          paste(factor_names[which(tab_primary < 2)], collapse = ", "),
+          ". Identification may be weak.")
+}
+
+# Build measurement lines
+cfa_model_lines <- character(0)
+for (j in seq_len(ncol(Lmat))) {
+  # primary items for factor j
+  items_j <- cfa_vars[j_primary == j]
+  
+  # optional cross-loadings above threshold (exclude primary assignments)
+  if (is.finite(cfa_cross_threshold) && cfa_cross_threshold > 0) {
+    cross_idx <- which(abs(Lmat[, j]) >= cfa_cross_threshold & j_primary != j)
+    items_j <- unique(c(items_j, cfa_vars[cross_idx]))
+  }
+  
+  if (length(items_j) > 0) {
+    cfa_model_lines <- c(
+      cfa_model_lines,
+      paste0(factor_names[j], " =~ ", paste(items_j, collapse = " + "))
+    )
+  }
+}
+
+# Factor covariances (all freely correlated)
+if (ncol(Lmat) > 1) {
+  cov_lines <- apply(utils::combn(factor_names, 2), 2,
+                     function(x) paste(x[1], "~~", x[2]))
+  cfa_model_lines <- c(cfa_model_lines, cov_lines)
+}
+
+cfa_model_text <- paste(cfa_model_lines, collapse = "\n")
+message("\n[CFA] Fitting CFA with the following syntax",
+        if (is.finite(cfa_cross_threshold)) paste0(" (cross_thresh=", cfa_cross_threshold, ")") else " (simple structure)",
+        ":\n", cfa_model_text, "\n")
+
+
+## 5. Fit the CFA model using lavaan (auto estimator) ----
+estimator_auto <- if (length(ordered_items) > 0) "WLSMV" else "MLR"
+ordered_arg    <- if (length(ordered_items) > 0) ordered_items else NULL
+
+fit_cfa <- tryCatch({
+  lavaan::cfa(
+    model     = cfa_model_text,
+    data      = cfa_df,
+    std.lv    = TRUE,
+    estimator = estimator_auto,
+    ordered   = ordered_arg
+  )
+}, error = function(e) {
+  message("[CFA ERROR] Could not fit the CFA model: ", e$message)
+  return(NULL)
 })
-if (ncol(Lambda0) > 1) {
-  pairs <- utils::combn(colnames(Lambda0), 2)
-  cfa_model_lines <- c(cfa_model_lines, apply(pairs, 2, function(x) paste(x[1], "~~", x[2])))
-}
-cfa_model <- paste(cfa_model_lines, collapse = "\n")
-cat("\n[CFA] Model syntax from EFA (Λ0):\n", cfa_model, "\n")
 
-# =============================================================================
-# 21. Robust CFA (aligned to EFA) — fit, MI refinement, diagnostics, outputs
-# =============================================================================
+if (is.null(fit_cfa)) stop("Initial CFA model fit failed.")
 
-fit_cfa <- safe_cfa(cfa_model, cfa_df, ordered_items)
-if (is.null(fit_cfa)) stop("CFA failed to fit.")
 
-fit_print(fit_cfa, "[CFA]")
-cat("\n[CFA] Standardized loadings:\n"); print(std_lambda(fit_cfa))
-cat("\n[CFA] Modification indices (MI > 10):\n")
-print(subset(lavaan::modindices(fit_cfa), mi > 10)[, c("lhs","op","rhs","mi")])
-
-# Save + diagram + factor scores + residual heatmap
-saveRDS(fit_cfa, "fit_cfa.rds")
-if (requireNamespace("semPlot", quietly = TRUE)) semplot_pdf(fit_cfa, "cfa_model_diagram.pdf")
-fs <- tryCatch(lavaan::lavPredict(fit_cfa, method="Bartlett"), error=function(e) NULL)
-if (!is.null(fs)) utils::write.csv(fs, "factor_scores.csv", row.names = TRUE)
-plot_resid_heatmap(fit_cfa, "CFA Residual Correlation Matrix")
-
-# MI refinement loop (unchanged logic)
-mi_out <- mi_refine(cfa_model, cfa_df, ordered_items, max_steps = 5, th = 10)
-cfa_model_refined <- mi_out$model; fit_cfa_refined <- mi_out$fit
-
-cat("\n[FINAL MODEL] Standardized solution:\n")
-print(summary(fit_cfa_refined, standardized = TRUE))
-
-# Heywood cases
-cat("\n[FINAL MODEL] Negative residual variances (Heywood cases):\n")
-pt_ref <- lavaan::parTable(fit_cfa_refined)
-neg_res <- subset(pt_ref, op=="~~" & lhs==rhs & est < 0)
-if (nrow(neg_res)) print(neg_res[, c("lhs","est")]) else cat("None detected.\n")
-
-cat("\n[FINAL MODEL] MI > 10:\n")
-mif <- lavaan::modindices(fit_cfa_refined); mif <- mif[order(-mif$mi), ]
-mf <- subset(mif, mi > 10 & !(op %in% c("~1","~")))
-if (nrow(mf)) print(mf[, c("lhs","op","rhs","mi")]) else cat("No MI > 10 remain.\n")
-plot_resid_heatmap(fit_cfa_refined, "Final CFA Residual Correlation Matrix")
-
-# =============================================================================
-# 22. Advanced diagnostics & model probes (wrapped but same operations)
-# =============================================================================
-
-# -- 1. Resolve Q70 Heywood (fix variance + distribution check) --
-Q70v <- "Q70__in_the_past_12_months_did_you_receive_any_info_from_anyone_on_agriculture__binary__1"
-q70_neg <- subset(pt_ref, op=="~~" & lhs==Q70v & rhs==Q70v & est < 0)
-if (nrow(q70_neg)) {
-  cat("\n[DIAGNOSTIC 1] Q70 Heywood detected. Fixing variance to 0.01 and refitting...\n")
-  cfa_model_fixed <- paste0(cfa_model_refined, "\n", Q70v, " ~~ 0.01*", Q70v)
-  fit_cfa_fixed   <- safe_cfa(cfa_model_fixed, cfa_df, ordered_items)
-  if (!is.null(fit_cfa_fixed)) {
-    fit_print(fit_cfa_fixed, "[Q70 FIXED]")
-    ol <- std_lambda(fit_cfa_refined)[Q70v, ]; fl <- std_lambda(fit_cfa_fixed)[Q70v, ]
-    cat("\nQ70 standardised loading (orig vs fixed):\n"); print(round(rbind(Original=ol, Fixed=fl), 3))
+## 6. Basic diagnostics: fit measures and loadings ----
+message("[CFA] Initial fit indices:")
+print(lavaan::fitMeasures(fit_cfa, c("chisq","df","pvalue","cfi","tli","rmsea","srmr")))
+message("[CFA] Standardized loadings (|λ| > 0.30):")
+std_loads <- lavaan::inspect(fit_cfa, "std")$lambda
+if (!is.null(std_loads)) {
+  for (f in colnames(std_loads)) {
+    significant <- abs(std_loads[, f]) > 0.30
+    if (any(significant)) {
+      cat(sprintf("  Factor %s:\n", f))
+      load_vals <- std_loads[significant, f]
+      for (nm in names(load_vals)) {
+        cat(sprintf("    %s : %.3f\n", nm, load_vals[nm]))
+      }
+    }
   }
-  # Q70 distribution
-  cat("\n[Q70] Frequency table:\n"); print(table(cfa_df[[Q70v]], useNA = "ifany"))
-  cat("Proportions:\n"); print(round(prop.table(table(cfa_df[[Q70v]], useNA = "no")), 3))
+}
+
+## 7. Modification indices: identify areas for improvement ----
+mi_tbl <- tryCatch(lavaan::modindices(fit_cfa),
+                   error = function(e) { message("[CFA] MI unavailable: ", e$message); NULL })
+
+mi_thresh <- 10
+if (!is.null(mi_tbl)) {
+  mi_tbl <- mi_tbl[order(-mi_tbl$mi), ]
+  high_mi <- subset(mi_tbl, mi > mi_thresh & !(op %in% c("~1","~")))
+  if (nrow(high_mi) > 0) {
+    message("[CFA] Modification indices (MI > ", mi_thresh, "):")
+    print(high_mi[, c("lhs","op","rhs","mi")])
+  } else {
+    message("[CFA] No modification indices greater than ", mi_thresh, " found.")
+  }
 } else {
-  cat("\n[DIAGNOSTIC 1] Q70 Heywood not detected.\n")
+  message("[CFA] Skipping MI listing (information matrix was singular).")
 }
 
-# -- 2a. Three-factor probe --
-cat("\n[DIAGNOSTIC 2a] Three-factor probe (Market-engagement / Information)...\n")
-Q62 <- "Q62__How_much_VEGETABLES_do_you_harvest_per_year_from_this_plot_kilograms__continuous"
-Q108<- "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous"
-Q112<- "Q112__Generally_speaking_how_would_you_define_your_farming__ordinal"
-Q109<- "Q109__What_is_your_households_yearly_income_overall_including_agriculture_NPR__continuous"
-Q5  <- "Q5__AgeYears__continuous"
-Q0h <- "Q0__hope_total__continuous"
-Q0s <- "Q0__self_control_score__continuous"
-Q52 <- "Q52__On_how_much_land_do_you_grow_vegetables_bigha__continuous"
 
-m3 <- paste(
-  paste("F1 =~", paste(c(Q62,Q108,Q0h), collapse=" + ")),
-  paste("F2 =~", paste(c(Q109,Q5,Q0s), collapse=" + ")),
-  paste("F3 =~", paste(c(Q112,Q70v,Q52), collapse=" + ")),
-  "F1 ~~ F2\nF1 ~~ F3\nF2 ~~ F3",
-  if (grepl("Q112.*Q70|Q70.*Q112", cfa_model_refined)) paste(Q112,"~~",Q70v) else "",
-  sep = "\n"
-)
-cat(m3, "\n")
-fit_cfa_3f <- safe_cfa(m3, cfa_df, ordered_items)
-if (!is.null(fit_cfa_3f)) {
-  fit_print(fit_cfa_3f, "[3-FACTOR]"); cat("\n[3-FACTOR] Std. loadings:\n"); print(std_lambda(fit_cfa_3f))
-  c2 <- lavaan::fitMeasures(fit_cfa_refined, c("chisq","df","cfi","rmsea","srmr"))
-  c3 <- lavaan::fitMeasures(fit_cfa_3f,     c("chisq","df","cfi","rmsea","srmr"))
-  print(data.frame(Model=c("2-Factor","3-Factor"),
-                   ChiSq=c(c2["chisq"],c3["chisq"]), DF=c(c2["df"],c3["df"]),
-                   CFI=c(c2["cfi"],c3["cfi"]), RMSEA=c(c2["rmsea"],c3["rmsea"]), SRMR=c(c2["srmr"],c3["srmr"])))
+## 8. Optional: automated MI refinement (up to max_steps modifications) ----
+max_steps <- 5
+cfa_refinement <- function(model_text, fit, data, ordered_vars, steps) {
+  current_model <- model_text
+  current_fit   <- fit
+  added         <- character(0)
+  for (s in seq_len(steps)) {
+    mi <- tryCatch(lavaan::modindices(current_fit), error = function(e) NULL)
+    if (is.null(mi)) break
+    mi <- mi[order(-mi$mi), ]
+    mi <- subset(mi, mi > mi_thresh & !(op %in% c("~1","~")))
+    mi <- mi[!paste(mi$lhs, mi$op, mi$rhs) %in% added, ]
+    if (nrow(mi) == 0) break
+    top <- mi[1, ]
+    new_term <- paste(top$lhs, top$op, top$rhs)
+    current_model <- paste(current_model, new_term, sep="\n")
+    added <- c(added, new_term)
+    message(sprintf("[MI] Adding: %s (MI = %.2f)\n", new_term, top$mi))
+    current_fit <- tryCatch({
+      lavaan::cfa(model = current_model, data = data, std.lv = TRUE,
+                  estimator = "WLSMV", ordered = ordered_vars)
+    }, error = function(e) { message("[MI ERROR] ", e$message); return(current_fit) })
+  }
+  list(model = current_model, fit = current_fit, added = added)
 }
 
-# -- 2b. Bifactor probe --
-cat("\n[DIAGNOSTIC 2b] Bifactor probe (general + specific info)...\n")
-mB <- paste(
-  paste("F1 =~", paste(c(Q62,Q108,Q0h,Q109,Q5,Q0s,Q112,Q70v,Q52), collapse=" + ")),
-  paste("S1 =~", paste(c(Q112,Q70v,Q52), collapse=" + ")),
-  "F1 ~~ 0*S1", if (grepl("Q112.*Q70|Q70.*Q112", cfa_model_refined)) paste(Q112,"~~",Q70v) else "",
-  sep = "\n"
-)
-cat(mB, "\n")
-fit_cfa_bifactor <- safe_cfa(mB, cfa_df, ordered_items)
-if (!is.null(fit_cfa_bifactor)) {
-  fit_print(fit_cfa_bifactor, "[BIFACTOR]"); cat("\n[BIFACTOR] Std. loadings:\n"); print(std_lambda(fit_cfa_bifactor))
+mi_results <- cfa_refinement(cfa_model_text, fit_cfa, cfa_df, ordered_items, max_steps)
+cfa_model_refined <- mi_results$model
+fit_cfa_refined  <- mi_results$fit
+
+message("\n[CFA] Refined model fit indices:")
+print(lavaan::fitMeasures(fit_cfa_refined, c("chisq","df","pvalue","cfi","tli","rmsea","srmr")))
+
+## 9. Save results, factor scores, residual plots (optional) ----
+saveRDS(fit_cfa_refined, file = "fit_cfa_refined.rds")
+if (requireNamespace("semPlot", quietly = TRUE)) {
+  pdf("cfa_refined_diagram.pdf", width = 10, height = 8)
+  semPlot::semPaths(fit_cfa_refined, "std", whatLabels = "std", edge.label.cex = 1.1, layout = "tree", style = "lisrel")
+  dev.off()
+}
+factor_scores <- tryCatch(lavaan::lavPredict(fit_cfa_refined, method="Bartlett"), error = function(e) NULL)
+if (!is.null(factor_scores)) {
+  utils::write.csv(factor_scores, "factor_scores.csv", row.names = TRUE)
 }
 
-# -- 3. Split-half cross-validation (same logic) --
-set.seed(2025)
-n <- nrow(cfa_df); idx <- sample(n); n2 <- floor(n/2)
-s1 <- cfa_df[idx[1:n2], , drop=FALSE]; s2 <- cfa_df[idx[(n2+1):n], , drop=FALSE]
-fit_s1 <- safe_cfa(cfa_model_refined, s1, ordered_items)
-fit_s2 <- safe_cfa(cfa_model_refined, s2, ordered_items)
-if (!is.null(fit_s1) && !is.null(fit_s2)) {
-  L1 <- std_lambda(fit_s1); L2 <- std_lambda(fit_s2)
-  key <- intersect(rownames(L1), rownames(L2))
-  if (length(key)) {
-    dif <- abs(L1[key, , drop=FALSE] - L2[key, , drop=FALSE])
-    cat("\n[SPLIT-HALF] Mean |Δ loading|:", round(mean(dif),3),
-        " Max |Δ|:", round(max(dif),3), "\n")
+resid_mat_cfa <- tryCatch(lavaan::residuals(fit_cfa_refined, type="cor")$cov, error = function(e) NULL)
+if (!is.null(resid_mat_cfa)) {
+  stats::heatmap(resid_mat_cfa, main = "Refined CFA Residual Correlation Matrix", symm = TRUE)
+}
+
+## 10. Advanced diagnostics: negative residual variances, alternative factor structures ----
+# Identify Heywood cases: parameters where a variable's residual variance is negative
+par_table_ref <- lavaan::parTable(fit_cfa_refined)
+neg_resid <- subset(par_table_ref, op == "~~" & lhs == rhs & est < 0)
+if (nrow(neg_resid) > 0) {
+  message("\n[CFA] Heywood cases detected (negative residual variances):")
+  print(neg_resid[, c("lhs", "est")])
+} else {
+  message("\n[CFA] No Heywood cases detected.")
+}
+
+# Simple example of probing an alternative factor structure: test a bifactor model if
+# there are at least three factors.  This is provided as a template and may
+# require adjustment for specific datasets.
+if (ncol(loading_matrix) >= 3) {
+  message("\n[CFA] Testing bifactor model (general + specific factors)...")
+  # General factor loads on all items; specific factors defined per original
+  gen_line <- paste("G =~", paste(cfa_vars, collapse = " + "))
+  spec_lines <- sapply(seq_len(ncol(loading_matrix)), function(j) {
+    # Items with highest loading on factor j
+    items <- cfa_vars[abs(loading_matrix[, j]) > 0]
+    paste0("S", j, " =~ ", paste(items, collapse=" + "))
+  })
+  bf_model <- paste(c(gen_line, spec_lines, paste0("G ~~ 0*", paste(paste0("S", seq_len(ncol(loading_matrix))), collapse = " + "))), collapse = "\n")
+  fit_bf <- safe_cfa(bf_model, cfa_df, ordered_items)
+  if (!is.null(fit_bf)) {
+    fit_print(fit_bf, "[BIFACTOR]")
   }
 }
 
-# -- 4. Bootstrap cross-validation on refined model (kept) --
+## 11. Split‑half cross‑validation ----
+if (nrow(cfa_df) > 1) {
+  set.seed(2025)
+  idx <- sample(nrow(cfa_df))
+  half <- floor(length(idx) / 2)
+  split1 <- cfa_df[idx[1:half], , drop = FALSE]
+  split2 <- cfa_df[idx[(half+1):length(idx)], , drop = FALSE]
+  fit_s1 <- safe_cfa(cfa_model_refined, split1, ordered_items)
+  fit_s2 <- safe_cfa(cfa_model_refined, split2, ordered_items)
+  if (!is.null(fit_s1) && !is.null(fit_s2)) {
+    L1 <- lavaan::inspect(fit_s1, "std")$lambda
+    L2 <- lavaan::inspect(fit_s2, "std")$lambda
+    common_items <- intersect(rownames(L1), rownames(L2))
+    if (length(common_items) > 0) {
+      diff_abs <- abs(L1[common_items, ] - L2[common_items, ])
+      message("\n[CFA] Split‑half cross‑validation: mean |Δ loading| = ", round(mean(diff_abs), 3), "; max |Δ| = ", round(max(diff_abs), 3))
+    }
+  }
+}
+
+## 12. Bootstrap cross‑validation for loadings (if parallel backend available) ----
 if (requireNamespace("foreach", quietly = TRUE) &&
     requireNamespace("doSNOW", quietly = TRUE) &&
     requireNamespace("parallel", quietly = TRUE)) {
   B_boot <- 100
-  n_cores <- max(1, parallel::detectCores()-1)
-  cl <- parallel::makeCluster(n_cores); doSNOW::registerDoSNOW(cl)
-  pb <- txtProgressBar(max=B_boot, style=3)
-  opts <- list(progress = function(i) setTxtProgressBar(pb, i))
-  key_vars <- rownames(std_lambda(fit_cfa_refined))
-  boot_loadings <- foreach::foreach(b=1:B_boot, .combine=rbind,
-                                    .packages="lavaan", .options.snow=opts) %dopar% {
-                                      ii <- sample(nrow(cfa_df), replace=TRUE); dat <- cfa_df[ii, ]
-                                      fb <- tryCatch(lavaan::cfa(cfa_model_refined, data=dat, std.lv=TRUE, estimator="WLSMV",
-                                                                 ordered=ordered_items), error=function(e) NULL)
-                                      if (is.null(fb)) return(rep(NA, length(key_vars)*ncol(Lambda0)))
-                                      Lb <- std_lambda(fb); as.vector(Lb[key_vars, , drop=FALSE])
-                                    }
-  close(pb); parallel::stopCluster(cl)
-  if (ncol(as.matrix(boot_loadings)) > 0) {
-    ci <- apply(boot_loadings, 2, stats::quantile, c(.025,.975), na.rm=TRUE)
-    cat("\n[BOOT] Example CI range for first few loadings:\n"); print(round(ci[, 1:min(6, ncol(ci))], 3))
+  n_cores <- max(1, parallel::detectCores() - 1)
+  cl_boot <- parallel::makeCluster(n_cores)
+  doSNOW::registerDoSNOW(cl_boot)
+  pb_boot <- txtProgressBar(max = B_boot, style = 3)
+  opts_boot <- list(progress = function(n) setTxtProgressBar(pb_boot, n))
+  items_order <- rownames(lavaan::inspect(fit_cfa_refined, "std")$lambda)
+  boot_load <- foreach::foreach(b = 1:B_boot, .combine = rbind,
+                                .packages = "lavaan", .options.snow = opts_boot) %dopar% {
+                                  samp_idx <- sample(nrow(cfa_df), replace = TRUE)
+                                  dat_b <- cfa_df[samp_idx, ]
+                                  fit_b <- tryCatch(lavaan::cfa(cfa_model_refined, data = dat_b, std.lv = TRUE,
+                                                                estimator = "WLSMV", ordered = ordered_items), error = function(e) NULL)
+                                  if (is.null(fit_b)) return(rep(NA, length(items_order) * ncol(loading_matrix)))
+                                  as.vector(lavaan::inspect(fit_b, "std")$lambda[items_order, , drop = FALSE])
+                                }
+  close(pb_boot)
+  parallel::stopCluster(cl_boot)
+  boot_conv <- mean(!is.na(boot_load[, 1]))
+  message("[CFA] Bootstrap convergence rate: ", round(boot_conv * 100, 1), "%")
+  if (boot_conv >= 0.95) {
+    boot_ci <- apply(boot_load, 2, stats::quantile, c(0.025, 0.975), na.rm = TRUE)
+    message("[CFA] Bootstrap 95% confidence intervals computed.")
+  } else {
+    message("[CFA] Bootstrap convergence <95%; results may be unreliable.")
   }
 }
 
-# -- 5. Parameter uncertainty (+ ordered category checks) --
-pt_full <- lavaan::parTable(fit_cfa_refined); pt_full$se_ratio <- abs(pt_full$est / pt_full$se)
-ldg <- subset(pt_full, op=="=~"); thr <- subset(pt_full, op=="|")
-large_se_loadings <- subset(ldg, se_ratio < 0.5)
-large_se_thresh   <- subset(thr, se_ratio < 0.5)
-cat("\n[SE] Large-SE loadings (SE ratio < .5):\n")
-if (nrow(large_se_loadings)) print(large_se_loadings[, c("lhs","rhs","est","se","se_ratio")]) else cat("None\n")
-cat("\n[SE] Large-SE thresholds (SE ratio < .5):\n")
-if (nrow(large_se_thresh)) print(large_se_thresh[, c("lhs","rhs","est","se","se_ratio")]) else cat("None\n")
-cat("\n[Ordered vars distribution]\n")
-for (v in ordered_items) if (v %in% names(cfa_df)) {
-  tab <- table(cfa_df[[v]], useNA="ifany"); cat("\n", v, ":\n"); print(tab)
-  sp <- tab[tab < 5]; if (length(sp)) { cat("Sparse (<5):\n"); print(sp) }
-}
-
-# -- 6. Quick summary & recommendations (kept) --
-cat("\n[SUMMARY] Diagnostics snapshot\n")
-cat(" • Q70 Heywood:", ifelse(nrow(q70_neg)>0, "DETECTED","NOT detected"), "\n")
-cat(" • 3-factor fit: ", ifelse(!is.null(fit_cfa_3f), "SUCCESS","FAILED"), "\n", sep="")
-cat(" • Bifactor fit: ", ifelse(!is.null(fit_cfa_bifactor), "SUCCESS","FAILED"), "\n", sep="")
-
-# =============================================================================
-# 23. Final model refinements and lock-in (composite + collapsing + bootstraps)
-# =============================================================================
-
-# Choose final base (fixed if available)
-if (exists("fit_cfa_fixed") && !is.null(fit_cfa_fixed)) {
-  fit_cfa_final <- fit_cfa_fixed;  cfa_model_final <- cfa_model_fixed
-  cat("\n[FINAL] Using fixed-error model for core.\n")
-} else {
-  fit_cfa_final <- fit_cfa_refined; cfa_model_final <- cfa_model_refined
-  cat("\n[FINAL] Using MI-refined model for core.\n")
-}
-fit_print(fit_cfa_final, "[FINAL CORE]")
-
-# 2a. Q70 + Q108 composite test
-Q108v <- "Q108__What_is_your_households_yearly_income_from_agriculture_NPR__continuous"
-if (all(c(Q70v, Q108v) %in% names(cfa_df))) {
-  cfa_df$Q70_Q108_composite <- (scale(as.numeric(cfa_df[[Q70v]])) + scale(cfa_df[[Q108v]])) / 2
-  # append composite to F1 line
-  ml <- strsplit(cfa_model_final, "\n")[[1]]
-  f1i <- grep("^F1 =~", ml); cfa_model_composite <- cfa_model_final
-  if (length(f1i)) {
-    ml[f1i[1]] <- paste0(ml[f1i[1]], " + Q70_Q108_composite")
-    cfa_model_composite <- paste(ml, collapse="\n")
+## 13. Collapsing sparse categories for ordered variables ----
+# Optionally collapse sparse categories (<5 observations) to improve model fit.
+collapse_sparse <- TRUE
+if (collapse_sparse) {
+  cfa_df_collapsed <- cfa_df
+  for (v in ordered_items) {
+    cfa_df_collapsed <- collapse_sparse_categories(cfa_df_collapsed, v, min_count = 5)
   }
-  fit_cfa_composite <- safe_cfa(cfa_model_composite, cfa_df, ordered_items)
-  if (!is.null(fit_cfa_composite)) {
-    fit_print(fit_cfa_composite, "[COMPOSITE]")
-    cat("\n[COMPOSITE] Std. loadings:\n"); print(std_lambda(fit_cfa_composite))
-    f0 <- lavaan::fitMeasures(fit_cfa_final,     c("chisq","df","cfi","rmsea","srmr"))
-    f1 <- lavaan::fitMeasures(fit_cfa_composite, c("chisq","df","cfi","rmsea","srmr"))
-    print(data.frame(Model=c("Original","Composite"),
-                     ChiSq=c(f0["chisq"],f1["chisq"]), DF=c(f0["df"],f1["df"]),
-                     CFI=c(f0["cfi"],f1["cfi"]), RMSEA=c(f0["rmsea"],f1["rmsea"]), SRMR=c(f0["srmr"],f1["srmr"])))
+  ordered_items_collapsed <- names(Filter(is.ordered, cfa_df_collapsed))
+  fit_cfa_collapsed <- safe_cfa(cfa_model_refined, cfa_df_collapsed, ordered_items_collapsed)
+  if (!is.null(fit_cfa_collapsed)) {
+    message("\n[CFA] Collapsed categories model fit indices:")
+    print(lavaan::fitMeasures(fit_cfa_collapsed, c("chisq","df","pvalue","cfi","tli","rmsea","srmr")))
   }
 }
 
-# 2b. Collapse sparse categories for ordered vars
-cfa_df_collapsed <- cfa_df
-for (v in ordered_items) cfa_df_collapsed <- collapse_sparse_categories(cfa_df_collapsed, v, min_count = 5)
-ordered_items_collapsed <- names(Filter(is.ordered, cfa_df_collapsed))
-fit_cfa_collapsed <- safe_cfa(if (exists("cfa_model_composite")) cfa_model_composite else cfa_model_final,
-                              cfa_df_collapsed, ordered_items_collapsed)
-if (!is.null(fit_cfa_collapsed)) {
-  fit_print(fit_cfa_collapsed, "[COLLAPSED]")
-  if (exists("fit_cfa_composite") && !is.null(fit_cfa_composite)) {
-    fc <- lavaan::fitMeasures(fit_cfa_collapsed, c("chisq","df","cfi","rmsea","srmr"))
-    fm <- lavaan::fitMeasures(fit_cfa_composite, c("chisq","df","cfi","rmsea","srmr"))
-    print(data.frame(Model=c("Composite","Collapsed"),
-                     ChiSq=c(fm["chisq"],fc["chisq"]), DF=c(fm["df"],fc["df"]),
-                     CFI=c(fm["cfi"],fc["cfi"]), RMSEA=c(fm["rmsea"],fc["rmsea"]), SRMR=c(fm["srmr"],fc["srmr"])))
-  }
+## 14. Final model selection and summary ----
+# Choose the best among original, refined, and collapsed models by CFI (highest)
+# and RMSEA (lowest).  All models are retained for inspection; best is printed.
+model_candidates <- list(original = fit_cfa, refined = fit_cfa_refined)
+if (exists("fit_cfa_collapsed") && !is.null(fit_cfa_collapsed)) {
+  model_candidates$collapsed <- fit_cfa_collapsed
 }
+model_metrics <- sapply(model_candidates, function(fit) {
+  fm <- lavaan::fitMeasures(fit, c("cfi", "rmsea", "srmr"))
+  c(CFI = fm["cfi"], RMSEA = fm["rmsea"], SRMR = fm["srmr"])
+})
+# Highest CFI and lowest RMSEA wins; tie broken by SRMR
+order_indices <- order(-model_metrics["CFI", ], model_metrics["RMSEA", ], model_metrics["SRMR", ])
+best_name <- names(model_candidates)[order_indices[1]]
+best_fit  <- model_candidates[[best_name]]
+message("\n[CFA] Best final model: ", best_name)
+print(model_metrics[, best_name])
 
-# 2c. Final bootstrap (CI) on best available spec
-boot_model   <- if (exists("cfa_model_composite")) cfa_model_composite else cfa_model_final
-boot_data    <- if (!is.null(fit_cfa_collapsed)) cfa_df_collapsed else cfa_df
-boot_ordered <- if (!is.null(fit_cfa_collapsed)) ordered_items_collapsed else ordered_items
-if (requireNamespace("foreach", quietly = TRUE) &&
-    requireNamespace("doSNOW", quietly = TRUE) &&
-    requireNamespace("parallel", quietly = TRUE)) {
-  Bf <- 200; n_cores <- max(1, parallel::detectCores()-1)
-  cl <- parallel::makeCluster(n_cores); doSNOW::registerDoSNOW(cl)
-  pb <- txtProgressBar(max=Bf, style=3)
-  opts <- list(progress=function(i) setTxtProgressBar(pb, i))
-  lam_target <- rownames(std_lambda(fit_cfa_final)); kfac <- ncol(Lambda0)
-  bootL <- foreach::foreach(b=1:Bf, .combine=rbind, .packages="lavaan", .options.snow=opts) %dopar% {
-    ii <- sample(nrow(boot_data), replace=TRUE); dat <- boot_data[ii, ]
-    fb <- tryCatch(lavaan::cfa(boot_model, data=dat, std.lv=TRUE, estimator="WLSMV", ordered=boot_ordered), error=function(e) NULL)
-    if (is.null(fb)) return(rep(NA, length(lam_target)*kfac))
-    as.vector(std_lambda(fb)[lam_target, , drop=FALSE])
-  }
-  close(pb); parallel::stopCluster(cl)
-  conv <- mean(!is.na(bootL[,1])); cat("\n[BOOT FINAL] Convergence rate:", round(conv*100,1), "%\n")
-  if (conv >= .95) {
-    ci <- apply(bootL, 2, stats::quantile, c(.025,.975), na.rm=TRUE)
-    cat("[BOOT FINAL] 95% CIs computed.\n")
-  } else cat("[BOOT FINAL] <95% convergence; interpret cautiously.\n")
-}
+## 15. Final measurement model report (delta parameterisation) ----
+# Build a concise report for the best model.  Use factor loadings, fit indices,
+# factor correlations, and a composite reliability estimate for each factor.
+Lam_best <- lavaan::inspect(best_fit, "std")$lambda
+Psi_best <- lavaan::inspect(best_fit, "std")$psi
+fm_best  <- lavaan::fitMeasures(best_fit, c("chisq","df","pvalue","cfi","tli","rmsea","rmsea.ci.lower","rmsea.ci.upper","srmr"))
 
-# Pick best final model by (CFI high & RMSEA low)
-best_model <- "original"; best_fit <- lavaan::fitMeasures(fit_cfa_final, c("cfi","rmsea","srmr"))
-if (exists("fit_cfa_composite") && !is.null(fit_cfa_composite)) {
-  fm <- lavaan::fitMeasures(fit_cfa_composite, c("cfi","rmsea","srmr"))
-  if (fm["cfi"] > best_fit["cfi"] && fm["rmsea"] < best_fit["rmsea"]) { best_model <- "composite"; best_fit <- fm }
-}
-if (!is.null(fit_cfa_collapsed)) {
-  fc <- lavaan::fitMeasures(fit_cfa_collapsed, c("cfi","rmsea","srmr"))
-  if (fc["cfi"] > best_fit["cfi"] && fc["rmsea"] < best_fit["rmsea"]) { best_model <- "collapsed"; best_fit <- fc }
-}
-cat("\n[FINAL PICK] Best model:", best_model, " | CFI=", round(best_fit["cfi"],3),
-    " RMSEA=", round(best_fit["rmsea"],3), " SRMR=", round(best_fit["srmr"],3), "\n")
+message("\n[FINAL MODEL REPORT]\n")
+cat(sprintf("χ²(%d) = %.2f, p = %.3f\n", as.integer(fm_best["df"]), fm_best["chisq"], fm_best["pvalue"]))
+cat(sprintf("CFI = %.3f, TLI = %.3f, RMSEA = %.3f [%.3f, %.3f], SRMR = %.3f\n",
+            fm_best["cfi"], fm_best["tli"], fm_best["rmsea"], fm_best["rmsea.ci.lower"],
+            fm_best["rmsea.ci.upper"], fm_best["srmr"]))
 
-saveRDS(list(
-  fit_cfa_refined = fit_cfa_refined,
-  fit_cfa_3f = if (exists("fit_cfa_3f")) fit_cfa_3f else NULL,
-  fit_cfa_bifactor = if (exists("fit_cfa_bifactor")) fit_cfa_bifactor else NULL,
-  fit_cfa_composite = if (exists("fit_cfa_composite")) fit_cfa_composite else NULL,
-  fit_cfa_collapsed = if (!is.null(fit_cfa_collapsed)) fit_cfa_collapsed else NULL
-), "cfa_diagnostics.rds")
-
-# =============================================================================
-# 24. Additional diagnostic checks (simple structure, residuals, collinearity)
-# =============================================================================
-
-# Issue 1: enforce simple structure for Q70 if cross-loading > .30 on F2
-Lfin <- std_lambda(fit_cfa_final)
-if (Q70v %in% rownames(Lfin) && "F2" %in% colnames(Lfin) && abs(Lfin[Q70v,"F2"]) > .30) {
-  cat("\n[ISSUE 1] Q70 cross-loading on F2 > .30 — constraining to F1 only.\n")
-  lines <- strsplit(cfa_model_final, "\n")[[1]]
-  f2i <- grep("^F2 =~", lines); if (length(f2i)) lines[f2i[1]] <- gsub(paste0("\\s*\\+?\\s*", Q70v), "", lines[f2i[1]])
-  f1i <- grep("^F1 =~", lines); if (length(f1i) && !grepl(Q70v, lines[f1i[1]], fixed=TRUE))
-    lines[f1i[1]] <- paste0(lines[f1i[1]], " + ", Q70v)
-  cfa_model_simple <- paste(lines, collapse="\n")
-  fit_cfa_simple <- safe_cfa(cfa_model_simple, cfa_df, ordered_items)
-  if (!is.null(fit_cfa_simple)) {
-    fit_print(fit_cfa_simple, "[SIMPLE]"); sl <- std_lambda(fit_cfa_simple); cat("\n[SIMPLE] Q70 loadings:\n"); print(round(sl[Q70v, ],3))
-    # small bootstrap for Q70->F1
-    if (requireNamespace("foreach", quietly = TRUE) &&
-        requireNamespace("doSNOW", quietly = TRUE) &&
-        requireNamespace("parallel", quietly = TRUE)) {
-      Bq <- 100; n_cores <- max(1, parallel::detectCores()-1)
-      cl <- parallel::makeCluster(n_cores); doSNOW::registerDoSNOW(cl)
-      pb <- txtProgressBar(max=Bq, style=3); opts <- list(progress=function(i) setTxtProgressBar(pb,i))
-      q70b <- foreach::foreach(b=1:Bq, .combine=c, .packages="lavaan", .options.snow=opts) %dopar% {
-        ii <- sample(nrow(cfa_df), replace=TRUE); dat <- cfa_df[ii, ]
-        fb <- tryCatch(lavaan::cfa(cfa_model_simple, data=dat, std.lv=TRUE, estimator="WLSMV", ordered=ordered_items), error=function(e) NULL)
-        if (is.null(fb)) return(NA_real_); std_lambda(fb)[Q70v,"F1"]
-      }
-      close(pb); parallel::stopCluster(cl)
-      cat("\n[SIMPLE] Q70→F1 bootstrap 95% CI:",
-          paste(round(stats::quantile(q70b, c(.025,.975), na.rm=TRUE),3), collapse=" to "), "\n")
+# Report loadings greater than .30
+for (f in colnames(Lam_best)) {
+  lam_f <- Lam_best[, f]
+  sel <- abs(lam_f) > 0.30
+  if (any(sel)) {
+    cat(sprintf("Factor %s loadings (|λ| > .30):\n", f))
+    for (nm in names(lam_f[sel])) {
+      cat(sprintf("  • %s : %.3f\n", nm, lam_f[nm]))
     }
   }
-} else cat("\n[ISSUE 1] Q70 simple structure OK.\n")
-
-# Issue 2: correlated residual Q112<->Q70 necessity
-pq <- lavaan::parTable(fit_cfa_final)
-q112q70 <- subset(pq, op=="~~" & ((lhs==Q112 & rhs==Q70v) | (lhs==Q70v & rhs==Q112)))
-if (nrow(q112q70)) {
-  cat("\n[ISSUE 2] Q112↔Q70 correlated residual present.\n"); print(q112q70[, intersect(c("lhs","op","rhs","est","se","pvalue"), names(q112q70)), drop=FALSE])
-  # try model without it
-  ln <- strsplit(cfa_model_final, "\n")[[1]]; ln2 <- ln[!grepl("Q112.*Q70|Q70.*Q112", ln)]
-  fit_noCorr <- safe_cfa(paste(ln2, collapse="\n"), cfa_df, ordered_items)
-  if (!is.null(fit_noCorr)) {
-    withCorr <- lavaan::fitMeasures(fit_cfa_final, c("chisq","df","cfi","rmsea","srmr"))
-    noCorr   <- lavaan::fitMeasures(fit_noCorr,   c("chisq","df","cfi","rmsea","srmr"))
-    print(data.frame(Model=c("WithCorr","NoCorr"),
-                     ChiSq=c(withCorr["chisq"],noCorr["chisq"]), DF=c(withCorr["df"],noCorr["df"]),
-                     CFI=c(withCorr["cfi"],noCorr["cfi"]), RMSEA=c(withCorr["rmsea"],noCorr["rmsea"]), SRMR=c(withCorr["srmr"],noCorr["srmr"])))
-    dX <- noCorr["chisq"]-withCorr["chisq"]; dd <- noCorr["df"]-withCorr["df"]; p <- 1-stats::pchisq(dX, dd)
-    cat(sprintf("Δχ²=%.3f, Δdf=%d, p=%.3f\n", dX, dd, p))
-  }
-} else cat("\n[ISSUE 2] No Q112↔Q70 correlated residual in final model.\n")
-
-# Issue 3: Q70–Q108 collinearity
-if (all(c(Q70v, Q108v) %in% names(cfa_df))) {
-  r <- stats::cor(as.numeric(cfa_df[[Q70v]]), cfa_df[[Q108v]], use="complete.obs")
-  cat("\n[ISSUE 3] Corr(Q70, Q108) =", round(r,3), "\n")
-  q70n <- as.numeric(cfa_df[[Q70v]]); q108z <- scale(cfa_df[[Q108v]])[,1]
-  r2 <- summary(stats::lm(q70n ~ q108z))$r.squared; vif <- 1/(1-r2)
-  cat("Pseudo-VIF(Q70 ~ Q108) =", round(vif,3), "\n")
 }
 
-# =============================================================================
-# 25. Final “measurement core” report (no composite; ordered/delta)
-# =============================================================================
+# Factor correlations
+if (!is.null(Psi_best) && ncol(Psi_best) > 1) {
+  for (i in 1:(ncol(Psi_best)-1)) {
+    for (j in (i+1):ncol(Psi_best)) {
+      r12 <- Psi_best[i, j]
+      cat(sprintf("Factor correlation (%s ↔ %s): %.3f\n", colnames(Psi_best)[i], colnames(Psi_best)[j], r12))
+    }
+  }
+}
 
-safestr <- function(x) ifelse(is.null(x)||!length(x), "NULL", paste(x, collapse=", "))
-use_collapsed <- exists("cfa_df_collapsed") && !is.null(cfa_df_collapsed)
-data_core     <- if (use_collapsed) cfa_df_collapsed else cfa_df
-ordered_core  <- if (use_collapsed && exists("ordered_items_collapsed")) ordered_items_collapsed else ordered_items
-ordered_core  <- unique(ordered_core[ordered_core %in% names(data_core)])
+# Composite reliability estimate per factor
+composite_rel <- function(loads) {
+  loads <- loads[abs(loads) > 0.30]
+  if (length(loads) < 2) return(NA_real_)
+  sl  <- sum(loads)
+  sl2 <- sum(loads^2)
+  se  <- length(loads) - sl2
+  (sl^2) / ((sl^2) + se)
+}
+for (f in colnames(Lam_best)) {
+  cr <- composite_rel(Lam_best[, f])
+  cat(sprintf("Composite reliability (%s): %s\n", f, ifelse(is.na(cr), "NA", sprintf("%.3f", cr))))
+}
 
-Q50 <- "Q50__How_much_land_that_is_yours_do_you_cultivate_bigha__continuous"
-Q0a <- "Q0__average_of_farming_practices__ordinal"
+cat("\n[NOTE] The final model uses WLSMV (delta parameterisation). Ordered variables are automatically treated as ordinal, and continuous variables are scaled prior to fitting.\n")
 
-cfa_model_core <- paste(
-  sprintf("F1 =~ %s + %s + %s + %s + %s + %s + %s", Q50, Q52, Q62, Q108, Q112, Q0a, Q70v),
-  sprintf("F2 =~ %s + %s + %s + %s + %s + %s + %s", Q5, Q52, Q109, Q0h, Q0s, Q0a, Q70v),
-  paste(Q112, "~~", Q70v),
-  paste(Q62,  "~~", Q0h),
-  "F1 ~~ F2",
-  sep = "\n"
-)
-cat("\n[FINAL MEASUREMENT CORE] Syntax:\n", cfa_model_core, "\n")
-
-fit_core <- safe_cfa(cfa_model_core, data_core, ordered_core)
-if (is.null(fit_core)) stop("Final core model failed.")
-ptc <- lavaan::parTable(fit_core)
-q70row <- subset(ptc, op=="~~" & lhs==Q70v & rhs==Q70v)
-if (nrow(q70row) && isTRUE(q70row$free[1] == 1))
-  stop("Q70 residual variance unexpectedly free. Ensure Q70 is ordered and WLSMV(delta).")
-cat("✓ Q70 residual variance fixed by identification (ordered, delta).\n")
-
-cat("\n[CORE] Using data: ", if (use_collapsed) "collapsed categories" else "original", "\n", sep="")
-cat("[CORE] Ordered variables: ", safestr(ordered_core), "\n", sep="")
-fm <- lavaan::fitMeasures(fit_core, c("chisq","df","pvalue","cfi","tli","rmsea","rmsea.ci.lower","rmsea.ci.upper","srmr"))
-cat(sprintf("\n[CORE FIT] χ²(%d)=%.2f, p=%.3f | CFI=%.3f, TLI=%.3f | RMSEA=%.3f [%.3f, %.3f] | SRMR=%.3f\n",
-            as.integer(fm["df"]), fm["chisq"], fm["pvalue"], fm["cfi"], fm["tli"],
-            fm["rmsea"], fm["rmsea.ci.lower"], fm["rmsea.ci.upper"], fm["srmr"]))
-
-Lam <- std_lambda(fit_core)
-cat("\n[CORE LOADINGS] (|λ|>.30)\n")
-if ("F1" %in% colnames(Lam)) print(round(Lam[abs(Lam[,"F1"])>.30,"F1", drop=FALSE],3))
-if ("F2" %in% colnames(Lam)) print(round(Lam[abs(Lam[,"F2"])>.30,"F2", drop=FALSE],3))
-Psi <- lavaan::inspect(fit_core, "std")$psi
-if (!is.null(Psi)) cat(sprintf("\nFactor correlation (F1↔F2): %.3f\n", Psi["F1","F2"]))
-
-# Simple reliability (composite-like)
-comp_rel <- function(v) { v <- v[is.finite(v)]; v <- v[abs(v)>.30]; if (length(v)<2) return(NA_real_); sl<-sum(v); sl2<-sum(v^2); se<-length(v)-sl2; (sl^2)/((sl^2)+se) }
-if ("F1" %in% colnames(Lam)) cat(sprintf("[RELIABILITY] F1: %s\n", ifelse(is.na(comp_rel(Lam[,"F1"])),"NA", round(comp_rel(Lam[,"F1"]),3))))
-if ("F2" %in% colnames(Lam)) cat(sprintf("[RELIABILITY] F2: %s\n", ifelse(is.na(comp_rel(Lam[,"F2"])),"NA", round(comp_rel(Lam[,"F2"]),3))))
-
-cat("\n[FINAL NOTE] Q112↔Q70 and Q62↔hope residual covariances retained if theory-consistent.\n")
-cat("\n=== CFA pipeline complete. Ready for reporting / structural modeling. ===\n")
 
 
 
